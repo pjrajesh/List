@@ -10,6 +10,7 @@ export interface ShoppingItem {
 
 export const BUDGET = 4000;
 
+// Legacy formatter kept as a fallback. Prefer formatCurrency from utils/currency.
 export const formatINR = (amount: number): string => {
   return `₹${amount.toLocaleString('en-IN')}`;
 };

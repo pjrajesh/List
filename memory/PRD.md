@@ -1,7 +1,21 @@
-# SmartCart - Shopping List App
+# Listorix - Shopping List App
 
 ## Original Problem Statement
-User built a shopping list app and requested: (1) code review with honest feedback, and (2) fresh redesigned frontend screens covering all flows.
+User built a shopping list app and requested: (1) code review with honest feedback, and (2) fresh redesigned frontend screens covering all flows. Subsequent sprints added bulk add, dark mode, currency toggle, notifications, and prepared OpenAI/Supabase integration scaffolding.
+
+## Latest Sprint (P0 + P1) — Completed 2026-04-27
+- Removed obstructing tertiary Scan FAB from home screen.
+- Add Item Sheet now supports Bulk mode (Single/Bulk toggle) — multi-line entry, comma- or newline-separated, with live count and "Add N items" button.
+- Profile gained Support section: Send Feedback (mail composer + mailto fallback to support@Listorix.com), Contact Support, Terms of Service, Privacy Policy.
+- Dark Mode now fully functional via Theme context (System/Light/Dark) with AsyncStorage persistence and full color-palette refactor across every screen.
+- Currency toggle works — 8 currencies via locale-aware formatCurrency utility, picker bottom sheet with flag emojis.
+- Notifications toggle — wired to expo-notifications: requests permission, schedules daily 6 PM repeating reminder, cancels on disable.
+- Settings persistence via AsyncStorage at `@listorix:settings:v1`.
+- iOS NSMicrophoneUsageDescription + Android NOTIFICATIONS / RECORD_AUDIO permissions added.
+
+## Deferred to Next Sprint
+- OpenAI Voice (Whisper) + Vision (scan receipts) — proxied via FastAPI backend (per user direction).
+- Supabase Auth (Google, Apple, Email).
 
 ## Architecture
 - **Frontend**: Expo React Native (SDK 54), expo-router v6, TypeScript

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SHADOWS } from '../constants/theme';
+import { ColorScheme, SHADOWS } from '../constants/theme';
+import { useTheme } from '../store/settings';
 
 const TABS = [
   { name: 'index', label: 'List', icon: 'list', iconActive: 'list' },
@@ -14,12 +15,15 @@ const TABS = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function CustomTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={[styles.wrapper, { paddingBottom: insets.bottom + 8 }]}>
       <View style={styles.container} testID="custom-tab-bar">
-        {state.routes.map((route, index) => {
+        {state.routes.map((route: any, index: number) => {
           const tab = TABS[index];
+          if (!tab) return null;
           const isFocused = state.index === index;
 
           const onPress = () => {
@@ -40,7 +44,7 @@ export default function CustomTabBar({ state, navigation }: any) {
                 <Ionicons
                   name={(isFocused ? tab.iconActive : tab.icon) as any}
                   size={22}
-                  color={isFocused ? '#fff' : COLORS.textSecondary}
+                  color={isFocused ? '#fff' : colors.textSecondary}
                 />
               </View>
               <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
@@ -54,15 +58,15 @@ export default function CustomTabBar({ state, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorScheme) => StyleSheet.create({
   wrapper: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   container: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 28,
     paddingVertical: 10,
     paddingHorizontal: 8,
@@ -70,28 +74,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     ...SHADOWS.lg,
   },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
+  tab: { flex: 1, alignItems: 'center', gap: 4 },
   tabInner: {
-    width: 44,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 44, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
   },
-  tabInnerActive: {
-    backgroundColor: COLORS.primary,
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-  },
-  tabLabelActive: {
-    color: COLORS.primary,
-    fontWeight: '700',
-  },
+  tabInnerActive: { backgroundColor: colors.primary },
+  tabLabel: { fontSize: 11, fontWeight: '500', color: colors.textSecondary },
+  tabLabelActive: { color: colors.primary, fontWeight: '700' },
 });

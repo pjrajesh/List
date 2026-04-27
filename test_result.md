@@ -101,3 +101,133 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Shopping list app — Listorix. Latest sprint (Message 193): Remove obstructing scan camera FAB,
+  enable bulk multi-line item entry, update profile screen support links, and make Notifications,
+  Dark Mode and Currency toggles actually work. OpenAI/Supabase integrations deferred to next sprint
+  (will be proxied via FastAPI backend).
+
+frontend:
+  - task: "Remove tertiary Scan FAB from home"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Scan FAB removed; only the orange + FAB remains. Verified visually via screenshot."
+
+  - task: "Bulk multi-line add (Add Item Sheet)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/AddItemSheet.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Added Single/Bulk toggle chip. Bulk mode accepts newline- or comma-separated items, parses live count, button changes to 'Add N items'. Each item gets keyword-based category auto-detection. Verified — entered 'Milk\\nBread\\nEggs' and button correctly showed 'Add 3 items'."
+
+  - task: "Profile — Send Feedback / Contact Support / Terms / Privacy"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "New 'Support' section with 4 actionable rows: Send Feedback (expo-mail-composer + mailto fallback to support@Listorix.com), Contact Support (mailto), Terms of Service & Privacy Policy (open via expo-web-browser). All wired and visible."
+
+  - task: "Dark Mode (system / light / dark)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/store/settings.tsx, /app/frontend/src/constants/theme.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Built full ThemeContext with light/dark palettes. All screens (home, history, insights, profile, tab bar, empty state, add sheet, modals) refactored to consume useTheme() with memoized createStyles(colors). Theme picker bottom sheet allows System/Light/Dark. Selection persists via AsyncStorage. Verified — switched to Dark, entire UI flips correctly, status bar updates."
+
+  - task: "Currency toggle (INR/USD/EUR/GBP/AED/JPY/CAD/AUD)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/utils/currency.ts, /app/frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Created formatCurrency(amount, code) using locale-aware toLocaleString. Bottom sheet picker with 8 currencies & flag emojis. Replaced all hardcoded ₹ with formatCurrency throughout home/history/insights/profile. Symbol updates everywhere on selection. Verified — switched to USD, all amounts re-render with $ prefix."
+
+  - task: "Notifications toggle with permission request + daily reminder"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/utils/notifications.ts, /app/frontend/src/store/settings.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "expo-notifications wired. On toggle ON: requests permission, schedules daily 6 PM repeating reminder, fires confirmation notification. On toggle OFF: cancels all scheduled notifications. State persists. iOS NSMicrophoneUsageDescription + Android NOTIFICATIONS/RECORD_AUDIO permissions added to app.json."
+
+  - task: "Settings persistence (AsyncStorage)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/store/settings.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Theme mode, currency, notifications, budget all persist to @listorix:settings:v1 via AsyncStorage and re-hydrate on launch."
+
+backend:
+  - task: "OpenAI proxy endpoints (voice/vision)"
+    implemented: false
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Deferred to next sprint per user request (P0+P1 only this sprint). Will proxy through FastAPI backend when user provides OpenAI key."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 3
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Bulk multi-line add"
+    - "Dark Mode (system / light / dark)"
+    - "Currency toggle"
+    - "Notifications toggle"
+    - "Profile — Support links"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: |
+        P0 + P1 sprint complete. Removed obstructing Scan FAB. Implemented bulk add, full dark mode
+        (with theme picker + AsyncStorage persistence), 8-currency picker with locale-aware formatting,
+        and working notifications toggle (perm request + daily reminder). Profile screen updated with
+        Send Feedback, Contact Support (support@Listorix.com), Terms, Privacy. All verified visually.
+        OpenAI/Supabase integrations remain for next sprint per user direction.

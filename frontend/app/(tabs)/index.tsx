@@ -1,16 +1,19 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  SafeAreaView, StatusBar, Modal, TextInput, KeyboardAvoidingView,
-  Platform, ScrollView, Alert,
+  StatusBar, Modal, TextInput, KeyboardAvoidingView,
+  Platform, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { COLORS, SHADOWS } from '../../src/constants/theme';
+import { ColorScheme, SHADOWS } from '../../src/constants/theme';
+import { useTheme, useSettings } from '../../src/store/settings';
+import { formatCurrency } from '../../src/utils/currency';
 import {
   personalItems as initialPersonal,
   familyItems as initialFamily,
-  BUDGET, ShoppingItem, formatINR, CATEGORIES,
+  ShoppingItem, CATEGORIES,
 } from '../../src/data/mockData';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
@@ -18,6 +21,10 @@ import EmptyState from '../../src/components/EmptyState';
 type Tab = 'personal' | 'family';
 
 export default function HomeScreen() {
+  const { colors, isDark } = useTheme();
+  const { currency, budget } = useSettings();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [activeTab, setActiveTab] = useState<Tab>('personal');
   const [personalList, setPersonalList] = useState<ShoppingItem[]>(initialPersonal);
   const [familyList, setFamilyList] = useState<ShoppingItem[]>(initialFamily);
@@ -41,16 +48,11 @@ export default function HomeScreen() {
     [activeTab]
   );
 
-  const totalSpent = items
-    .filter(i => i.price !== null)
-    .reduce((sum, i) => sum + (i.price || 0), 0);
-
-  const budgetProgress = Math.min(totalSpent / BUDGET, 1);
+  const totalSpent = items.filter(i => i.price !== null).reduce((sum, i) => sum + (i.price || 0), 0);
+  const budgetProgress = Math.min(totalSpent / budget, 1);
 
   const categoryMap: Record<string, number> = {};
-  items.forEach(i => {
-    if (i.price) categoryMap[i.category] = (categoryMap[i.category] || 0) + i.price;
-  });
+  items.forEach(i => { if (i.price) categoryMap[i.category] = (categoryMap[i.category] || 0) + i.price; });
   const topCategory = Object.entries(categoryMap).sort((a, b) => b[1] - a[1])[0];
 
   const toggleItem = useCallback((id: string) => {
@@ -108,14 +110,6 @@ export default function HomeScreen() {
     setItems(() => []);
     setShowListOptions(false);
   }, [setItems]);
-
-  const handleScan = () => {
-    Alert.alert(
-      '📷 Scan Receipt',
-      'Point your camera at a receipt to auto-extract all items.\n\nConnect your Supabase backend to activate this feature.',
-      [{ text: 'Got it', style: 'default' }]
-    );
-  };
 
   const checkedCount = items.filter(i => i.checked).length;
   const unchecked = items.filter(i => !i.checked);
@@ -180,7 +174,7 @@ export default function HomeScreen() {
         </View>
         {item.price !== null ? (
           <Text style={[styles.itemPrice, item.checked && styles.itemPriceMuted]}>
-            {formatINR(item.price)}
+            {formatCurrency(item.price, currency)}
           </Text>
         ) : (
           <TouchableOpacity
@@ -202,18 +196,18 @@ export default function HomeScreen() {
         <View style={styles.budgetRow}>
           <View>
             <Text style={styles.budgetLabel}>This Month</Text>
-            <Text style={styles.budgetAmount}>{formatINR(totalSpent)}</Text>
+            <Text style={styles.budgetAmount}>{formatCurrency(totalSpent, currency)}</Text>
           </View>
           <View style={styles.budgetRight}>
             <Text style={styles.budgetLimitLabel}>Budget</Text>
-            <Text style={styles.budgetLimit}>{formatINR(BUDGET)}</Text>
+            <Text style={styles.budgetLimit}>{formatCurrency(budget, currency)}</Text>
           </View>
         </View>
         <View style={styles.progressBg}>
           <View style={[styles.progressFill, { width: `${Math.max(budgetProgress * 100, 4)}%` as any }]} />
         </View>
         <Text style={styles.progressHint}>
-          {formatINR(BUDGET - totalSpent)} remaining · {Math.round(budgetProgress * 100)}% used
+          {formatCurrency(Math.max(budget - totalSpent, 0), currency)} remaining · {Math.round(budgetProgress * 100)}% used
         </Text>
       </View>
 
@@ -221,7 +215,7 @@ export default function HomeScreen() {
         <View style={styles.insightPill} testID="insight-pill">
           <Text style={styles.insightIcon}>💡</Text>
           <Text style={styles.insightText}>
-            Top spend: <Text style={styles.insightBold}>{topCategory[0]}</Text> — {formatINR(topCategory[1])}
+            Top spend: <Text style={styles.insightBold}>{topCategory[0]}</Text> — {formatCurrency(topCategory[1], currency)}
           </Text>
         </View>
       )}
@@ -268,10 +262,9 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} testID="home-screen">
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+    <SafeAreaView style={styles.container} edges={['top']} testID="home-screen">
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
-      {/* Header - no duplicate icons */}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good morning! ☀️</Text>
@@ -282,7 +275,7 @@ export default function HomeScreen() {
           style={styles.optionsBtn}
           onPress={() => setShowListOptions(true)}
         >
-          <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.textPrimary} />
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -296,16 +289,6 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         testID="shopping-items-list"
       />
-
-      {/* Scan FAB — tertiary, small, above main */}
-      <TouchableOpacity
-        testID="scan-fab"
-        style={styles.scanFab}
-        onPress={handleScan}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
-      </TouchableOpacity>
 
       {/* Main FAB — primary add action */}
       <TouchableOpacity
@@ -334,7 +317,7 @@ export default function HomeScreen() {
             <Text style={styles.modalLabel}>Add price for</Text>
             <Text style={styles.modalItemName}>{priceItem?.name}</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.rupeeSign}>₹</Text>
+              <Text style={styles.rupeeSign}>{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '¤'}</Text>
               <TextInput
                 testID="price-modal-input"
                 style={styles.priceModalInput}
@@ -343,7 +326,7 @@ export default function HomeScreen() {
                 value={priceText}
                 onChangeText={setPriceText}
                 autoFocus
-                placeholderTextColor={COLORS.textSecondary}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
             <View style={styles.modalBtns}>
@@ -375,13 +358,13 @@ export default function HomeScreen() {
                 value={editName}
                 onChangeText={setEditName}
                 autoFocus
-                placeholderTextColor={COLORS.textSecondary}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
 
             <Text style={styles.inputLabel}>Price</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.rupeeSign}>₹</Text>
+              <Text style={styles.rupeeSign}>{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '¤'}</Text>
               <TextInput
                 testID="edit-price-input"
                 style={styles.priceModalInput}
@@ -389,11 +372,11 @@ export default function HomeScreen() {
                 keyboardType="decimal-pad"
                 value={editPrice}
                 onChangeText={setEditPrice}
-                placeholderTextColor={COLORS.textSecondary}
+                placeholderTextColor={colors.textTertiary}
               />
               {editPrice.length > 0 && (
                 <TouchableOpacity onPress={() => setEditPrice('')}>
-                  <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
+                  <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -450,8 +433,8 @@ export default function HomeScreen() {
               onPress={clearChecked}
               disabled={checkedCount === 0}
             >
-              <View style={[styles.optionIcon, { backgroundColor: COLORS.primaryLight }]}>
-                <Ionicons name="checkmark-done-outline" size={20} color={COLORS.primary} />
+              <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
+                <Ionicons name="checkmark-done-outline" size={20} color={colors.primary} />
               </View>
               <View style={styles.optionTextBlock}>
                 <Text style={[styles.optionLabel, checkedCount === 0 && styles.optionLabelDisabled]}>
@@ -469,11 +452,11 @@ export default function HomeScreen() {
               onPress={clearAll}
               disabled={allItems.length === 0}
             >
-              <View style={[styles.optionIcon, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+              <View style={[styles.optionIcon, { backgroundColor: colors.errorLight }]}>
+                <Ionicons name="trash-outline" size={20} color={colors.error} />
               </View>
               <View style={styles.optionTextBlock}>
-                <Text style={[styles.optionLabel, { color: COLORS.error }, allItems.length === 0 && styles.optionLabelDisabled]}>
+                <Text style={[styles.optionLabel, { color: colors.error }, allItems.length === 0 && styles.optionLabelDisabled]}>
                   Clear entire list
                 </Text>
                 <Text style={styles.optionSubLabel}>
@@ -496,26 +479,22 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (colors: ColorScheme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8,
   },
-  greeting: { fontSize: 22, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: -0.5 },
-  greetingSub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2, fontWeight: '500' },
+  greeting: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
+  greetingSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '500' },
   optionsBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
     ...SHADOWS.sm,
   },
   listContent: { paddingHorizontal: 16, paddingBottom: 90 },
   budgetCard: {
-    backgroundColor: COLORS.primary, borderRadius: 24, padding: 20,
+    backgroundColor: colors.primary, borderRadius: 24, padding: 20,
     marginBottom: 12, marginTop: 8, ...SHADOWS.md,
   },
   budgetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
@@ -529,97 +508,89 @@ const styles = StyleSheet.create({
   progressHint: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 8, fontWeight: '500' },
   insightPill: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.secondaryLight, borderRadius: 16,
+    backgroundColor: colors.secondaryLight, borderRadius: 16,
     padding: 14, marginBottom: 16, gap: 10,
-    borderWidth: 1, borderColor: '#FFD4B0',
+    borderWidth: 1, borderColor: colors.border,
   },
   insightIcon: { fontSize: 20 },
-  insightText: { flex: 1, fontSize: 14, color: '#9A3412', lineHeight: 20, fontWeight: '500' },
+  insightText: { flex: 1, fontSize: 14, color: colors.textPrimary, lineHeight: 20, fontWeight: '500' },
   insightBold: { fontWeight: '800' },
   tabRow: {
-    flexDirection: 'row', backgroundColor: COLORS.surface,
+    flexDirection: 'row', backgroundColor: colors.surface,
     borderRadius: 16, padding: 4, marginBottom: 12, ...SHADOWS.sm,
   },
   tabBtn: { flex: 1, paddingVertical: 11, borderRadius: 12, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: COLORS.primary },
-  tabBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.textSecondary },
+  tabBtnActive: { backgroundColor: colors.primary },
+  tabBtnText: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
   tabBtnTextActive: { color: '#fff' },
   listMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  listMetaText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
-  swipeHint: { fontSize: 11, color: COLORS.textSecondary, fontStyle: 'italic' },
+  listMetaText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
+  swipeHint: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' },
   itemWrapper: {
     marginBottom: 8, borderRadius: 18, overflow: 'hidden',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     elevation: 2,
   },
   itemRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.surface, padding: 14, gap: 12,
+    backgroundColor: colors.surface, padding: 14, gap: 12,
   },
-  itemRowChecked: { opacity: 0.65 },
+  itemRowChecked: { opacity: 0.6 },
   checkbox: {
     width: 28, height: 28, borderRadius: 14,
-    borderWidth: 2, borderColor: COLORS.border,
+    borderWidth: 2, borderColor: colors.borderStrong,
     alignItems: 'center', justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: COLORS.success, borderColor: COLORS.success },
+  checkboxChecked: { backgroundColor: colors.success, borderColor: colors.success },
   itemInfo: { flex: 1, gap: 5 },
-  itemName: { fontSize: 16, fontWeight: '600', color: COLORS.textPrimary },
-  itemNameChecked: { textDecorationLine: 'line-through', color: COLORS.textSecondary, fontWeight: '400' },
+  itemName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  itemNameChecked: { textDecorationLine: 'line-through', color: colors.textSecondary, fontWeight: '400' },
   categoryChip: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  categoryText: { fontSize: 11, fontWeight: '600', color: COLORS.textPrimary },
-  itemPrice: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
-  itemPriceMuted: { color: COLORS.textSecondary, fontWeight: '400' },
-  addPriceBtn: { backgroundColor: COLORS.primaryLight, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  addPriceText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
+  categoryText: { fontSize: 11, fontWeight: '600', color: '#1A1A1A' },
+  itemPrice: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  itemPriceMuted: { color: colors.textSecondary, fontWeight: '400' },
+  addPriceBtn: { backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  addPriceText: { fontSize: 13, fontWeight: '700', color: colors.primary },
   deleteAction: {
-    backgroundColor: COLORS.error, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.error, justifyContent: 'center', alignItems: 'center',
     width: 80, gap: 4,
   },
   deleteActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
   editAction: {
-    backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
     width: 80, gap: 4,
   },
   editActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-  scanFab: {
-    position: 'absolute', bottom: 90, right: 27,
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: COLORS.border,
-    ...SHADOWS.sm,
-  },
   fab: {
     position: 'absolute', bottom: 20, right: 20,
     width: 58, height: 58, borderRadius: 29,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: colors.secondary,
     alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg,
   },
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1, backgroundColor: colors.modalBackdrop,
     justifyContent: 'center', alignItems: 'center',
   },
   modal: {
-    backgroundColor: COLORS.surface, borderRadius: 28,
+    backgroundColor: colors.surface, borderRadius: 28,
     padding: 24, width: '90%', ...SHADOWS.lg,
   },
-  modalLabel: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500', marginBottom: 4 },
-  modalItemName: { fontSize: 18, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 20 },
-  editModalTitle: { fontSize: 20, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 18 },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  modalLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '500', marginBottom: 4 },
+  modalItemName: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 20 },
+  editModalTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginBottom: 18 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
   inputRow: {
-    backgroundColor: COLORS.background, borderRadius: 14, paddingHorizontal: 14,
-    paddingVertical: 12, marginBottom: 16, borderWidth: 2, borderColor: COLORS.primary,
+    backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14,
+    paddingVertical: 12, marginBottom: 16, borderWidth: 2, borderColor: colors.primary,
   },
-  textInput: { fontSize: 16, fontWeight: '600', color: COLORS.textPrimary },
+  textInput: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
   priceInputRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.background, borderRadius: 14, paddingHorizontal: 14,
-    paddingVertical: 10, marginBottom: 16, gap: 8, borderWidth: 2, borderColor: COLORS.primary,
+    backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14,
+    paddingVertical: 10, marginBottom: 16, gap: 8, borderWidth: 2, borderColor: colors.primary,
   },
-  rupeeSign: { fontSize: 22, fontWeight: '700', color: COLORS.primary },
-  priceModalInput: { flex: 1, fontSize: 24, fontWeight: '700', color: COLORS.textPrimary, padding: 0 },
+  rupeeSign: { fontSize: 22, fontWeight: '700', color: colors.primary },
+  priceModalInput: { flex: 1, fontSize: 24, fontWeight: '700', color: colors.textPrimary, padding: 0 },
   catScroll: { marginBottom: 20 },
   catScrollContent: { gap: 8, paddingRight: 8 },
   catChip: {
@@ -627,46 +598,43 @@ const styles = StyleSheet.create({
     paddingVertical: 8, borderRadius: 20, gap: 4,
     borderWidth: 2, borderColor: 'transparent',
   },
-  catChipSelected: { borderColor: COLORS.primary },
-  catChipText: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary },
+  catChipSelected: { borderColor: colors.primary },
+  catChipText: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
   modalBtns: { flexDirection: 'row', gap: 12 },
   cancelBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 14,
-    backgroundColor: COLORS.background, alignItems: 'center',
-    borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: colors.inputBg, alignItems: 'center',
+    borderWidth: 1, borderColor: colors.border,
   },
-  cancelText: { fontSize: 15, fontWeight: '600', color: COLORS.textSecondary },
-  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center' },
+  cancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center' },
   saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  optionsOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
+  optionsOverlay: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
   optionsSheet: {
-    backgroundColor: COLORS.surface, borderTopLeftRadius: 32,
+    backgroundColor: colors.surface, borderTopLeftRadius: 32,
     borderTopRightRadius: 32, paddingHorizontal: 20, paddingBottom: 40, paddingTop: 12,
     ...SHADOWS.lg,
   },
   optionsHandle: {
-    width: 44, height: 5, backgroundColor: COLORS.border,
+    width: 44, height: 5, backgroundColor: colors.border,
     borderRadius: 99, alignSelf: 'center', marginBottom: 20,
   },
-  optionsTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 16 },
+  optionsTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 16 },
   optionRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.background, borderRadius: 18,
+    backgroundColor: colors.inputBg, borderRadius: 18,
     padding: 16, marginBottom: 10, gap: 14,
   },
   optionRowDisabled: { opacity: 0.4 },
   optionIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   optionTextBlock: { flex: 1 },
-  optionLabel: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
-  optionLabelDisabled: { color: COLORS.textSecondary },
-  optionSubLabel: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2, fontWeight: '400' },
+  optionLabel: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  optionLabelDisabled: { color: colors.textSecondary },
+  optionSubLabel: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '400' },
   optionsCancelBtn: {
-    backgroundColor: COLORS.surface, borderRadius: 18,
+    backgroundColor: colors.surface, borderRadius: 18,
     paddingVertical: 16, alignItems: 'center', marginTop: 4,
-    borderWidth: 1, borderColor: COLORS.border,
+    borderWidth: 1, borderColor: colors.border,
   },
-  optionsCancelText: { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary },
+  optionsCancelText: { fontSize: 16, fontWeight: '700', color: colors.textSecondary },
 });
