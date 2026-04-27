@@ -64,7 +64,7 @@ User built a shopping list app and requested: (1) code review with honest feedba
 ## What's Been Implemented
 - [x] Fresh premium design (green/orange/cream palette)
 - [x] All 5 screens + Add Item sheet
-- [x] Custom floating tab navigation
+- [x] Custom floating tab navigation (flow-based, sticky)
 - [x] Interactive checkboxes with animation
 - [x] Add price modal flow
 - [x] Budget progress tracking
@@ -72,7 +72,14 @@ User built a shopping list app and requested: (1) code review with honest feedba
 - [x] Expandable history cards
 - [x] Custom bar charts
 - [x] Full settings page with working toggles
-- [x] 100% test pass rate
+- [x] Sticky bottom navbar (flow-based, not absolute)
+- [x] FAB properly positioned (bottom:20, not touching navbar)
+- [x] No duplicate profile icon (header has only ... menu)
+- [x] List Options sheet: clear checked / clear entire list (no history pollution)
+- [x] Swipe left to delete items
+- [x] Swipe right / long press to edit items (name, price, category)
+- [x] Edit Item modal with pre-populated values
+- [x] GestureHandlerRootView at root for gesture support
 
 ## Prioritized Backlog
 
