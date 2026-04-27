@@ -1,0 +1,166 @@
+{
+  "theme": "light",
+  "archetype": "Hybrid: 6 (Vibrant Play) + 1 (Organic & Earthy)",
+  "design_philosophy": "Fresh Indian Market. Moving away from sterile light-gray/blue SaaS aesthetics to a warm, vibrant, and tactile experience. Inspired by modern Indian quick-commerce (Blinkit, Zepto) but elevated for personal finance. High contrast, large typography, and expressive colors.",
+  "colors": {
+    "background": "#F9F8F4",
+    "surface": "#FFFFFF",
+    "surface_highlight": "#F0Fdf4",
+    "primary": "#0B6E4F",
+    "primary_light": "#E6F4EA",
+    "secondary": "#FA6400",
+    "secondary_light": "#FFF0E6",
+    "accent_yellow": "#FFB800",
+    "text_primary": "#1A1A1A",
+    "text_secondary": "#6B7280",
+    "border": "#E5E7EB",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "error": "#EF4444"
+  },
+  "typography": {
+    "fontFamily": "System",
+    "rules": {
+      "h1": { "fontSize": 36, "fontWeight": "800", "letterSpacing": -1, "lineHeight": 44, "color": "#1A1A1A" },
+      "h2": { "fontSize": 28, "fontWeight": "700", "letterSpacing": -0.5, "lineHeight": 36, "color": "#1A1A1A" },
+      "h3": { "fontSize": 20, "fontWeight": "600", "letterSpacing": 0, "lineHeight": 28, "color": "#1A1A1A" },
+      "body_large": { "fontSize": 18, "fontWeight": "500", "lineHeight": 26, "color": "#1A1A1A" },
+      "body": { "fontSize": 16, "fontWeight": "400", "lineHeight": 24, "color": "#1A1A1A" },
+      "caption": { "fontSize": 14, "fontWeight": "500", "letterSpacing": 0.5, "lineHeight": 20, "color": "#6B7280" },
+      "currency_large": { "fontSize": 40, "fontWeight": "900", "letterSpacing": -2, "color": "#0B6E4F" }
+    }
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "xxl": 48
+  },
+  "radii": {
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "pill": 999
+  },
+  "shadows": {
+    "sm": {
+      "shadowColor": "#000",
+      "shadowOffset": { "width": 0, "height": 2 },
+      "shadowOpacity": 0.05,
+      "shadowRadius": 4,
+      "elevation": 2
+    },
+    "md": {
+      "shadowColor": "#0B6E4F",
+      "shadowOffset": { "width": 0, "height": 8 },
+      "shadowOpacity": 0.08,
+      "shadowRadius": 16,
+      "elevation": 4
+    },
+    "floating_nav": {
+      "shadowColor": "#000",
+      "shadowOffset": { "width": 0, "height": 12 },
+      "shadowOpacity": 0.1,
+      "shadowRadius": 24,
+      "elevation": 8
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": {
+        "backgroundColor": "#0B6E4F",
+        "borderRadius": 999,
+        "paddingVertical": 16,
+        "paddingHorizontal": 32,
+        "alignItems": "center",
+        "justifyContent": "center"
+      },
+      "voice_scan_fab": {
+        "backgroundColor": "#FA6400",
+        "width": 64,
+        "height": 64,
+        "borderRadius": 32,
+        "alignItems": "center",
+        "justifyContent": "center"
+      }
+    },
+    "cards": {
+      "default": {
+        "backgroundColor": "#FFFFFF",
+        "borderRadius": 24,
+        "padding": 24,
+        "borderWidth": 1,
+        "borderColor": "#E5E7EB"
+      },
+      "highlight": {
+        "backgroundColor": "#E6F4EA",
+        "borderRadius": 24,
+        "padding": 24,
+        "borderWidth": 1,
+        "borderColor": "#0B6E4F"
+      }
+    },
+    "list_item": {
+      "flexDirection": "row",
+      "alignItems": "center",
+      "justifyContent": "space-between",
+      "paddingVertical": 16,
+      "borderBottomWidth": 1,
+      "borderBottomColor": "#F3F4F6"
+    },
+    "bottom_navigation": {
+      "position": "absolute",
+      "bottom": 24,
+      "left": 24,
+      "right": 24,
+      "backgroundColor": "#FFFFFF",
+      "borderRadius": 999,
+      "flexDirection": "row",
+      "justifyContent": "space-around",
+      "paddingVertical": 16,
+      "alignItems": "center"
+    }
+  },
+  "screens": {
+    "Home": {
+      "header": "Large greeting (e.g., 'Morning, Priya ☀️'). Below it, a massive Budget Card showing total spent in ₹ and a thick rounded progress bar.",
+      "ai_insight_bar": "A horizontal pill just below the budget card. Soft orange background (#FFF0E6) with text like '💡 You are spending 15% more on Dairy this week.'",
+      "list_tabs": "Pill-shaped toggle for 'Personal' vs 'Family'. Active state uses #0B6E4F background.",
+      "items": "Checkboxes should be large circular outlines. When checked, fill with #10B981 and strikethrough the text."
+    },
+    "AddItemBottomSheet": {
+      "layout": "Handle at top. Large seamless text input taking focus. Below it, a dynamic row of 3 massive action areas: Keyboard, Voice (Mic Icon), Receipt Scan (Camera Icon).",
+      "emphasis": "Make the Voice and Scan buttons visually dominant (using the #FA6400 accent) to highlight these key differentiators."
+    },
+    "History": {
+      "layout": "Grouped by date. Each trip is a collapsed card summarizing the store, total ₹, and number of items. Tap to expand."
+    },
+    "Insights": {
+      "layout": "Large expressive charts. Do not use generic thin line charts. Use thick, colorful bar charts with rounded caps. Top spending categories should use large Emoji icons (🥦, 🥛, 🧼) alongside ₹ amounts."
+    }
+  },
+  "image_urls": {
+    "onboarding_backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1760108273055-e9bb6e7f3a0c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwzfHxmcmVzaCUyMGNvbG9yZnVsJTIwdmVnZXRhYmxlcyUyMGdyb2NlcmllcyUyMG1hcmtldHxlbnwwfHx8fDE3NzczMDA2MjB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Fresh apples and tangerines for splash/onboarding texture"
+      },
+      {
+        "url": "https://images.pexels.com/photos/31930013/pexels-photo-31930013.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Vibrant market vegetables for empty states or insight headers"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Strictly use React Native's StyleSheet.create(). Do not use HTML tags like <div> or classes like className='p-4'.",
+    "Build a custom floating Bottom Navigation bar over the screen content, avoiding standard unstyled tab bars.",
+    "Use the specific Hex codes provided in this JSON. The brand color is Deep Green (#0B6E4F) and vibrant orange (#FA6400) for high-impact actions.",
+    "Ensure all interactive components (TouchableOpacity, TextInput) have a data-testid attribute in kebab-case based on their role (e.g., data-testid='add-item-voice-btn').",
+    "Format all prices clearly with the ₹ symbol and standard Indian comma formatting (e.g., ₹ 1,500).",
+    "For the AI Insight bar, use the highlighted card styling (soft orange or green background) to make it stand out from regular list items.",
+    "The hero section of the Home screen must be the Budget display. Use the `currency_large` typography rule for the main amount.",
+    "For Voice and Scan functionalities, since this is UI design, build highly visible UI entry points (large icon buttons) even if the hardware API is mocked."
+  ]
+}
