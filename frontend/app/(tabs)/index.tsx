@@ -13,6 +13,7 @@ import {
   BUDGET, ShoppingItem, formatINR, CATEGORIES,
 } from '../../src/data/mockData';
 import AddItemSheet from '../../src/components/AddItemSheet';
+import EmptyState from '../../src/components/EmptyState';
 
 type Tab = 'personal' | 'family';
 
@@ -243,17 +244,19 @@ export default function HomeScreen() {
           {allItems.length} item{allItems.length !== 1 ? 's' : ''}
           {checked.length > 0 ? `  ·  ${checked.length} done ✓` : ''}
         </Text>
-        <Text style={styles.swipeHint}>← edit  |  delete →</Text>
+        {allItems.length > 0 && (
+          <Text style={styles.swipeHint}>← edit  |  delete →</Text>
+        )}
       </View>
     </>
   );
 
   const ListEmpty = () => (
-    <View style={styles.emptyState} testID="empty-state">
-      <Text style={styles.emptyEmoji}>🛒</Text>
-      <Text style={styles.emptyTitle}>Your list is empty</Text>
-      <Text style={styles.emptySubtitle}>Tap + to add items, or use voice & scan</Text>
-    </View>
+    <EmptyState
+      listType={activeTab}
+      onAdd={handleAddItem}
+      onOpenSheet={() => setShowSheet(true)}
+    />
   );
 
   return (
@@ -561,10 +564,6 @@ const styles = StyleSheet.create({
     width: 80, gap: 4,
   },
   editActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-  emptyState: { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
-  emptyEmoji: { fontSize: 60, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center' },
   fab: {
     position: 'absolute', bottom: 20, right: 20,
     width: 58, height: 58, borderRadius: 29,
