@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   SafeAreaView, StatusBar, Modal, TextInput, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -108,6 +108,14 @@ export default function HomeScreen() {
     setItems(() => []);
     setShowListOptions(false);
   }, [setItems]);
+
+  const handleScan = () => {
+    Alert.alert(
+      '📷 Scan Receipt',
+      'Point your camera at a receipt to auto-extract all items.\n\nConnect your Supabase backend to activate this feature.',
+      [{ text: 'Got it', style: 'default' }]
+    );
+  };
 
   const checkedCount = items.filter(i => i.checked).length;
   const unchecked = items.filter(i => !i.checked);
@@ -289,7 +297,17 @@ export default function HomeScreen() {
         testID="shopping-items-list"
       />
 
-      {/* FAB */}
+      {/* Scan FAB — tertiary, small, above main */}
+      <TouchableOpacity
+        testID="scan-fab"
+        style={styles.scanFab}
+        onPress={handleScan}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
+      </TouchableOpacity>
+
+      {/* Main FAB — primary add action */}
       <TouchableOpacity
         testID="add-item-fab"
         style={styles.fab}
@@ -564,6 +582,14 @@ const styles = StyleSheet.create({
     width: 80, gap: 4,
   },
   editActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
+  scanFab: {
+    position: 'absolute', bottom: 90, right: 27,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: COLORS.border,
+    ...SHADOWS.sm,
+  },
   fab: {
     position: 'absolute', bottom: 20, right: 20,
     width: 58, height: 58, borderRadius: 29,
