@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8, borderRadius: 20,
   },
   filterText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
-  listContent: { paddingHorizontal: 16, paddingBottom: 160 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 24 },
   summaryCard: {
     backgroundColor: COLORS.primary, borderRadius: 24,
     padding: 20, marginBottom: 20, marginTop: 8, ...SHADOWS.md,

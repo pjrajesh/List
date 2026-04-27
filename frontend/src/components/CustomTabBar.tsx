@@ -56,13 +56,9 @@ export default function CustomTabBar({ state, navigation }: any) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 16,
     paddingTop: 8,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.background,
   },
   container: {
     flexDirection: 'row',
