@@ -226,8 +226,32 @@ test_plan:
 agent_communication:
     - agent: "main"
       message: |
-        P0 + P1 sprint complete. Removed obstructing Scan FAB. Implemented bulk add, full dark mode
-        (with theme picker + AsyncStorage persistence), 8-currency picker with locale-aware formatting,
-        and working notifications toggle (perm request + daily reminder). Profile screen updated with
-        Send Feedback, Contact Support (support@Listorix.com), Terms, Privacy. All verified visually.
-        OpenAI/Supabase integrations remain for next sprint per user direction.
+        Sprint complete: Family Sharing with Supabase (auth + RLS + Realtime).
+
+        SHIPPED:
+        - Sapphire & Champagne Gold premium palette (light + dark). Deep #1E3A8A primary,
+          #C9A86A gold accent, warm ivory #FAFAF7 background.
+        - Supabase client with SecureStore persistence (AsyncStorage fallback on web)
+        - Auth screens: Welcome, Sign up, Log in (email+password via Supabase)
+        - Route guards in root _layout.tsx using expo-router segments
+        - Data APIs: /api/groups, /api/items (CRUD + bulk)
+        - Groups management modal (app/groups.tsx): list/create/invite/leave/delete
+        - Invite flow: generates https://listorix.com/join/<token> → native Share sheet
+        - Deep link handler: accepts listorix:// and https://listorix.com/join/* URLs, auto-joins group via accept_invite RPC
+        - Group switcher pill at top of home, routes to /groups modal
+        - Home refactored to use Supabase items scoped by currentGroupId (null = Personal, else = group)
+        - Supabase Realtime subscription on items table → live sync + LOCAL notification when another member adds
+        - Profile updated to use Supabase user + sign out + "Manage groups" link
+        - Personal list stays private (owner_id-scoped, group_id null)
+
+        REQUIRES USER ACTION:
+        1. Run /app/supabase/schema.sql in Supabase SQL editor (creates tables, RLS, triggers, accept_invite RPC, enables Realtime on items + group_members)
+        2. In Supabase Auth settings, optionally disable "Confirm email" for frictionless signup during testing, or leave it on and have users confirm via email link
+
+        KNOWN LIMITATIONS:
+        - Push notifications in background: requires Edge Function + device_tokens wiring (deferred; currently we do LOCAL notifications on realtime events while app is open)
+        - Google/Apple OAuth: email+password works now; OAuth providers need configuring in Supabase dashboard
+        - Universal link AASA/Digital Asset Links: not hosted on listorix.com yet — for now link opens via scheme listorix:// in Expo Go/dev build
+
+        PENDING VERIFICATION:
+        - Full signup → invite → accept flow end-to-end (needs user to run schema.sql first)

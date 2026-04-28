@@ -1,6 +1,5 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
@@ -12,46 +11,59 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('[supabase] Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY');
 }
 
-// SecureStore has a ~2KB value limit; Supabase session JSON can exceed that.
-// Strategy: use SecureStore on native, AsyncStorage fallback on web.
-const ExpoSecureStoreAdapter = {
-  getItem: async (key: string) => {
-    if (Platform.OS === 'web') return AsyncStorage.getItem(key);
-    try {
-      return await SecureStore.getItemAsync(key);
-    } catch {
-      return AsyncStorage.getItem(key);
-    }
-  },
-  setItem: async (key: string, value: string) => {
-    if (Platform.OS === 'web') return AsyncStorage.setItem(key, value);
-    try {
-      // SecureStore limit is 2048 bytes; chunk fallback → use AsyncStorage for larger values
-      if (value.length > 1800) {
-        await AsyncStorage.setItem(key, value);
-        return;
-      }
-      await SecureStore.setItemAsync(key, value);
-    } catch {
-      await AsyncStorage.setItem(key, value);
-    }
-  },
-  removeItem: async (key: string) => {
-    if (Platform.OS === 'web') return AsyncStorage.removeItem(key);
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch {
-      // ignore
-    }
-    await AsyncStorage.removeItem(key);
-  },
+// SSR-safe storage adapter.
+// During Metro's server-render (no window, no native modules), return a noop adapter.
+// On web: use AsyncStorage (which wraps localStorage).
+// On native: try expo-secure-store; fall back to AsyncStorage for values >1800 bytes or if SecureStore fails.
+const isBrowser = typeof window !== 'undefined';
+
+// noop for SSR
+const noopStorage = {
+  getItem: async (_k: string) => null,
+  setItem: async (_k: string, _v: string) => {},
+  removeItem: async (_k: string) => {},
 };
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+function createStorage() {
+  if (!isBrowser) return noopStorage;
+  if (Platform.OS === 'web') {
+    return {
+      getItem: (k: string) => AsyncStorage.getItem(k),
+      setItem: (k: string, v: string) => AsyncStorage.setItem(k, v),
+      removeItem: (k: string) => AsyncStorage.removeItem(k),
+    };
+  }
+  // Native: lazy-require SecureStore so it isn't touched during SSR
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const SecureStore = require('expo-secure-store');
+  return {
+    getItem: async (k: string) => {
+      try { return await SecureStore.getItemAsync(k); }
+      catch { return AsyncStorage.getItem(k); }
+    },
+    setItem: async (k: string, v: string) => {
+      try {
+        if (v.length > 1800) {
+          await AsyncStorage.setItem(k, v);
+          return;
+        }
+        await SecureStore.setItemAsync(k, v);
+      } catch {
+        await AsyncStorage.setItem(k, v);
+      }
+    },
+    removeItem: async (k: string) => {
+      try { await SecureStore.deleteItemAsync(k); } catch {/* ignore */}
+      await AsyncStorage.removeItem(k);
+    },
+  };
+}
+
+export const supabase = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder', {
   auth: {
-    storage: ExpoSecureStoreAdapter as any,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage: createStorage() as any,
+    autoRefreshToken: isBrowser,
+    persistSession: isBrowser,
     detectSessionInUrl: false,
   },
   realtime: {
