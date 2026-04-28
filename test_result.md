@@ -423,3 +423,37 @@ frontend:
             android.permissions in app.json.
             NOTE: Voice + Scan only work on iOS / Android — tapping on web shows a friendly
             "open Listorix on your phone" alert.
+
+  - task: "Streaks + Monthly Wrapped + AI usage strip (Bundle 1)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/wrapped.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            New /app/frontend/src/api/insights.ts computes streaks (current/longest, 30-day active set),
+            monthly wrapped (added/checked counts, total spent, biggest splurge, top 5 items, top category,
+            most active day, distinct categories & days), and 7-day AI usage history.
+
+            New components:
+              - /app/frontend/src/components/StreakCard.tsx — fire/sparkles streak badge + 7-dot strip,
+                tappable to open the wrap. Friendly "start your streak" empty state.
+              - /app/frontend/src/components/AIUsageStrip.tsx — paired voice (primary) + scan (secondary)
+                bar chart for the last 7 days with today highlighted; shows totals + legend.
+
+            New screen:
+              - /app/frontend/app/wrapped.tsx — Spotify-style monthly wrap with:
+                  hero card, added/checked counters, total-spent big number, biggest-splurge tile,
+                  Top 5 items list, top category + busiest day pair, closing "share my wrap" CTA.
+                  Shareable text via React Native Share API.
+
+            Insights tab now renders StreakCard + AIUsageStrip + a "View Monthly Wrap" button under
+            the existing hero. Wrap route registered as a modal in /app/frontend/app/_layout.tsx.
+
+            All data is computed client-side from Supabase items and usage_quotas tables — no backend
+            changes required. Bundle compiles cleanly; web preview verified.
+            Manual testing on physical device recommended (streaks fill in once items are added).

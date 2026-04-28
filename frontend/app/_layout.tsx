@@ -109,6 +109,7 @@ export default function RootLayout() {
                   <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
                   <Stack.Screen name="groups" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                   <Stack.Screen name="notifications-settings" options={{ animation: 'slide_from_right' }} />
+                  <Stack.Screen name="wrapped" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                 </Stack>
               </NavigationGuard>
             </ThemedShell>

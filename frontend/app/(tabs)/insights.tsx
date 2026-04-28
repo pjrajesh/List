@@ -5,10 +5,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme, useSettings } from '../../src/store/settings';
 import { formatCurrency } from '../../src/utils/currency';
 import { insightsData } from '../../src/data/mockData';
+import StreakCard from '../../src/components/StreakCard';
+import AIUsageStrip from '../../src/components/AIUsageStrip';
 
 const { width } = Dimensions.get('window');
 const BAR_MAX_WIDTH = width - 32 - 32 - 80 - 72;
@@ -18,6 +21,7 @@ const MONTHS = ['Feb', 'Mar', 'Apr'];
 export default function InsightsScreen() {
   const { colors, isDark } = useTheme();
   const { currency, budget } = useSettings();
+  const router = useRouter();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [selectedMonth, setSelectedMonth] = useState('Apr');
   const maxAmount = Math.max(...insightsData.categories.map(c => c.amount));
@@ -67,7 +71,20 @@ export default function InsightsScreen() {
               {formatCurrency(insightsData.totalThisMonth - insightsData.totalLastMonth, currency)} more than March
             </Text>
           </View>
+          <TouchableOpacity
+            testID="open-wrapped-btn"
+            style={styles.wrappedBtn}
+            onPress={() => router.push('/wrapped' as any)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="gift-outline" size={16} color="#1E3A8A" />
+            <Text style={styles.wrappedBtnText}>View Monthly Wrap</Text>
+            <Ionicons name="chevron-forward" size={14} color="#1E3A8A" />
+          </TouchableOpacity>
         </View>
+
+        <StreakCard onPress={() => router.push('/wrapped' as any)} />
+        <AIUsageStrip />
 
         <View style={styles.section} testID="weekly-trend-section">
           <Text style={styles.sectionTitle}>Weekly Breakdown</Text>
@@ -175,6 +192,11 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   changeText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   vsRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   vsText: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '500' },
+  wrappedBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#fff', borderRadius: 14, paddingVertical: 11, marginTop: 14,
+  },
+  wrappedBtnText: { fontSize: 14, fontWeight: '800', color: '#1E3A8A', letterSpacing: -0.2 },
   section: { marginBottom: 24 },
   sectionTitle: {
     fontSize: 18, fontWeight: '800', color: colors.textPrimary,
