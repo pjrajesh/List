@@ -6,7 +6,7 @@ interface AuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -38,12 +38,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { display_name: displayName || email.split('@')[0] } },
     });
-    return { error: error?.message ?? null };
+    return {
+      error: error?.message ?? null,
+      // session is present when email-confirmation is OFF in Supabase → user is auto-logged-in
+      needsConfirmation: !error && !data.session,
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

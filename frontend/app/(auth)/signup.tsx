@@ -29,10 +29,19 @@ export default function SignUp() {
     if (!canSubmit || busy) return;
     setBusy(true);
     setErr(null);
-    const { error } = await signUp(email.trim(), password, name.trim() || undefined);
+    const { error, needsConfirmation } = await signUp(email.trim(), password, name.trim() || undefined);
     setBusy(false);
-    if (error) setErr(error);
-    else Alert.alert('Check your email', 'We sent a confirmation link. After confirming, log in to continue.');
+    if (error) {
+      setErr(error);
+    } else if (needsConfirmation) {
+      // Supabase has "Confirm email" turned ON — user must click link first
+      Alert.alert(
+        'Check your email 📧',
+        'We sent you a confirmation link. Tap it to activate your account, then log in.',
+        [{ text: 'OK', onPress: () => {} }]
+      );
+    }
+    // else: session was created immediately → AuthContext listener will redirect to tabs
   };
 
   return (
