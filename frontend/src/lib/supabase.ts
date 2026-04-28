@@ -64,9 +64,18 @@ export const supabase = createClient(SUPABASE_URL || 'https://placeholder.supaba
     storage: createStorage() as any,
     autoRefreshToken: isBrowser,
     persistSession: isBrowser,
-    detectSessionInUrl: false,
+    detectSessionInUrl: typeof window !== 'undefined' && Platform.OS === 'web',
   },
   realtime: {
     params: { eventsPerSecond: 10 },
   },
 });
+
+// Also enable detectSessionInUrl on web so OAuth redirects auto-establish session.
+// (We skip this on native since we manually handle the redirect via WebBrowser.)
+if (isBrowser && Platform.OS === 'web') {
+  // Re-init not needed; the createClient detectSessionInUrl default for web handles
+  // the case via the URL on first load. Below we additionally re-fetch session in case
+  // the user just landed back from an OAuth redirect.
+  supabase.auth.getSession().catch(() => {});
+}

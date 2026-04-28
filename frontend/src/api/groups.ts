@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getCurrentUserId } from '../lib/auth-helpers';
 
 export interface Group {
   id: string;
@@ -37,11 +38,10 @@ export async function listMyGroups(): Promise<Group[]> {
 }
 
 export async function createGroup(name: string, emoji: string = '👥'): Promise<Group> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('Not authenticated');
+  const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('groups')
-    .insert({ name, emoji, owner_id: userData.user.id })
+    .insert({ name, emoji, owner_id: userId })
     .select('*')
     .single();
   if (error) throw error;
@@ -49,13 +49,12 @@ export async function createGroup(name: string, emoji: string = '👥'): Promise
 }
 
 export async function leaveGroup(groupId: string): Promise<void> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('Not authenticated');
+  const userId = await getCurrentUserId();
   const { error } = await supabase
     .from('group_members')
     .delete()
     .eq('group_id', groupId)
-    .eq('user_id', userData.user.id);
+    .eq('user_id', userId);
   if (error) throw error;
 }
 
@@ -92,14 +91,13 @@ function genToken(len = 10): string {
 }
 
 export async function createInvite(groupId: string, expiresInDays: number = 7): Promise<{ token: string; url: string }> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('Not authenticated');
+  const userId = await getCurrentUserId();
   const token = genToken(10);
   const expiresAt = new Date(Date.now() + expiresInDays * 24 * 3600 * 1000).toISOString();
   const { error } = await supabase.from('invites').insert({
     group_id: groupId,
     token,
-    created_by: userData.user.id,
+    created_by: userId,
     expires_at: expiresAt,
     max_uses: 50,
   });

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getCurrentUserId } from '../lib/auth-helpers';
 
 export interface RemoteItem {
   id: string;
@@ -25,11 +26,11 @@ export interface ItemDraft {
 
 export async function listItems(opts: { groupId?: string | null; personal?: boolean }): Promise<RemoteItem[]> {
   let q = supabase.from('items').select('*').order('created_at', { ascending: true });
-  if (opts.groupId) q = q.eq('group_id', opts.groupId);
-  else if (opts.personal) {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return [];
-    q = q.eq('owner_id', userData.user.id);
+  if (opts.groupId) {
+    q = q.eq('group_id', opts.groupId);
+  } else if (opts.personal) {
+    const userId = await getCurrentUserId();
+    q = q.eq('owner_id', userId);
   } else {
     return [];
   }
@@ -39,8 +40,7 @@ export async function listItems(opts: { groupId?: string | null; personal?: bool
 }
 
 export async function addItem(opts: { groupId?: string | null; personal?: boolean }, draft: ItemDraft): Promise<RemoteItem> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('Not authenticated');
+  const userId = await getCurrentUserId();
   const payload: any = {
     name: draft.name,
     price: draft.price ?? null,
@@ -48,13 +48,13 @@ export async function addItem(opts: { groupId?: string | null; personal?: boolea
     emoji: draft.emoji ?? null,
     color: draft.color ?? null,
     checked: false,
-    created_by: userData.user.id,
+    created_by: userId,
   };
   if (opts.groupId) {
     payload.group_id = opts.groupId;
     payload.owner_id = null;
   } else {
-    payload.owner_id = userData.user.id;
+    payload.owner_id = userId;
     payload.group_id = null;
   }
   const { data, error } = await supabase.from('items').insert(payload).select('*').single();
@@ -64,8 +64,7 @@ export async function addItem(opts: { groupId?: string | null; personal?: boolea
 
 export async function addItemsBulk(opts: { groupId?: string | null; personal?: boolean }, drafts: ItemDraft[]): Promise<RemoteItem[]> {
   if (drafts.length === 0) return [];
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('Not authenticated');
+  const userId = await getCurrentUserId();
   const rows = drafts.map(d => ({
     name: d.name,
     price: d.price ?? null,
@@ -73,9 +72,9 @@ export async function addItemsBulk(opts: { groupId?: string | null; personal?: b
     emoji: d.emoji ?? null,
     color: d.color ?? null,
     checked: false,
-    created_by: userData.user!.id,
+    created_by: userId,
     group_id: opts.groupId ?? null,
-    owner_id: opts.groupId ? null : userData.user!.id,
+    owner_id: opts.groupId ? null : userId,
   }));
   const { data, error } = await supabase.from('items').insert(rows).select('*');
   if (error) throw error;
