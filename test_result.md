@@ -276,6 +276,71 @@ backend:
             JWT auth: validates Bearer token via Supabase /auth/v1/user.
             REQUIRES USER ACTION: set SUPABASE_SERVICE_ROLE_KEY in /app/backend/.env and run
             /app/supabase/notifications_schema.sql in Supabase SQL editor.
+        - working: "NA"
+          agent: "main"
+          comment: |
+            User has now set SUPABASE_SERVICE_ROLE_KEY in /app/backend/.env and run
+            /app/supabase/notifications_schema.sql successfully. Backend health endpoint
+            /api/notifications/health returns supabase_configured=true. Ready for backend testing.
+            Test plan:
+              1. GET /api/notifications/health → 200, supabase_configured=true
+              2. POST /api/notifications/send WITHOUT auth → 401
+              3. POST /api/notifications/send with INVALID Bearer → 401
+              4. Sign up a test user via Supabase auth REST (POST {SUPABASE_URL}/auth/v1/signup
+                 with apikey=SUPABASE_ANON_KEY), grab access_token from response.
+              5. POST /api/notifications/send with valid JWT but no group/no target_user_ids
+                 → 200 with sent=0 (empty audience).
+              6. POST /api/notifications/send with valid JWT and target_user_ids=[caller_id]
+                 (excluded as sender) → 200 with sent=0.
+              7. POST /api/notifications/send with valid JWT and target_user_ids=[caller_id]
+                 + exclude_user_id="00000000-0000-0000-0000-000000000000" so caller IS targeted.
+                 No device_tokens row yet → 200 with sent=0, skipped_no_token>=1.
+              8. Verify Pydantic event enum rejects bogus event values (422).
+            Supabase URL = https://vdvrkzeproulsrbguhgt.supabase.co
+            ANON key = sb_publishable_lZ0cJid7KN-z7yzhikxKPQ_LRfSwTlA
+            Backend base = http://localhost:8001  (also reachable via /api ingress)
+        - working: true
+          agent: "testing"
+          comment: |
+            Full backend test run executed via curl against http://localhost:8001/api/notifications/*.
+            All 11 scenarios from the review request PASSED.
+
+            1) GET /api/notifications/health → 200
+               {"ok":true,"supabase_configured":true,"supabase_url_set":true,"service_key_set":true}
+
+            2a) POST /send no Authorization header → 401 {"detail":"Missing bearer token"}
+            2b) POST /send Bearer "not-a-real-jwt"  → 401 {"detail":"Invalid auth token"}
+            2c) POST /send (valid JWT) event:"totally_bogus" → 422 with Pydantic literal_error listing the 5 valid events.
+                NOTE: with an INVALID bearer the auth dependency rejects with 401 before body validation runs (FastAPI resolves Header dependencies before body Pydantic validation in this code path), so to exercise the 422 contract a valid JWT is required. With valid JWT, 422 is correctly returned. Behavior is acceptable.
+            2d) POST /send (valid JWT) missing title/body → 422 missing-field error for both "title" and "body".
+
+            3) Real Supabase JWT acquired via POST {SUPABASE_URL}/auth/v1/signup with apikey=ANON.
+               Test user: notif_test_1bab5459@listorix.dev
+               caller_id (user.id) = 97bd1c92-2c60-4b4a-abac-96402ff6e837
+               access_token returned directly (email confirmation disabled, as expected).
+               Default notification_preferences row was auto-created by the SQL trigger — confirmed via downstream PATCH responses (204 No Content => row found and updated).
+
+            4a) Empty audience → 200, sent=0, all skipped_*=0, error=null. ✓
+            4b) target_user_ids=[caller_id] (caller auto-excluded as sender) → 200, sent=0, all skipped_*=0. ✓
+            4c) target_user_ids=[caller_id], exclude_user_id="00000000-..." (force include caller, no device_tokens registered) → 200, sent=0, skipped_no_token=1. ✓
+                Proves backend successfully queried notification_preferences AND device_tokens via SUPABASE_SERVICE_ROLE_KEY.
+
+            4d) PATCH item_added=false (PostgREST 204), then repeat 4c → 200, sent=0, skipped_pref_off=1. ✓ Reset to true (204).
+            4e) PATCH muted=true (204), then repeat 4c → 200, sent=0, skipped_muted=1. ✓ Reset muted=false (204).
+            4f) PATCH quiet_enabled=true, quiet_start=0, quiet_end=23 (204), then repeat 4c → 200, sent=0, skipped_quiet=1. ✓ Reset quiet_enabled=false (204).
+
+            CONCLUSIONS:
+            - JWT verification via /auth/v1/user works.
+            - Audience resolution (target_user_ids path), sender auto-exclusion, and exclude_user_id override all behave per spec.
+            - Service-role reads of notification_preferences and device_tokens succeed (RLS bypassed correctly).
+            - Per-event preference filter, master mute filter, and quiet-hours filter each independently produce the correct skip counter.
+            - Pydantic Literal validates the 5 allowed event types; required fields enforced.
+            - SUPABASE_SERVICE_ROLE_KEY is loaded server-side only; never exposed in any response payload.
+            - Test user left in place (harmless). No code changes were made to backend.
+
+            STATUS: /api/notifications/send and /api/notifications/health are working as designed. Marking working: true and needs_retesting: false.
+
+
 
 frontend:
   - task: "Push token registration + notification preferences UI"
