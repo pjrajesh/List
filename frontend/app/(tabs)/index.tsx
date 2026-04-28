@@ -422,6 +422,7 @@ export default function HomeScreen() {
         onClose={() => setShowSheet(false)}
         onAddBulk={handleAddItems}
         listLabel={listLabel}
+        existingNames={items.map(i => i.name)}
       />
 
       {/* Price Modal */}

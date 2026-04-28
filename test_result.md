@@ -361,3 +361,65 @@ frontend:
             src/api/notifications.ts client + preference fetch/update.
             Hooked events: index.tsx item add/check, _layout.tsx member_joined on accept_invite.
             NOTE: Remote push tokens require a development build — Expo Go SDK 53+ no longer supports them.
+
+
+  - task: "AI Voice + Receipt Scan with daily quotas"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/ai.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Built FastAPI router /api/ai/* (mounted in server.py).
+            Endpoints:
+              GET  /api/ai/health   → diagnostics (openai_configured, voice_limit=20, scan_limit=10)
+              GET  /api/ai/usage?day_local=YYYY-MM-DD → today's quota for caller (auth)
+              POST /api/ai/voice/transcribe (multipart audio + day_local form field) → gpt-4o-transcribe + gpt-4o-mini parsing
+                  Returns {ok, is_shopping_intent, rejection_reason, transcript, items[], usage}
+                  RULES:
+                   - 401 if no/invalid JWT
+                   - 429 if voice_count >= 20 for the day (returns detail.message)
+                   - When AI classifies as song/music/silence/gibberish/unrelated → ok=false, items=[],
+                     and the request does NOT increment the user's voice quota.
+                   - Successful shopping-intent extraction increments voice_count by 1.
+              POST /api/ai/scan/receipt (multipart image + day_local form field) → gpt-4o vision (json_schema)
+                  Returns {ok, source, currency, items[], usage}
+                  RULES:
+                   - 401 if no/invalid JWT
+                   - 429 if scan_count >= 10 for the day
+                   - Server compresses image to max 1600px JPEG q=82 before sending to OpenAI.
+                   - Recognizes Zepto / Swiggy / Blinkit / Instamart / BigBasket / paper receipt / list / unknown.
+                   - If items=[], scan does NOT increment quota.
+
+            REQUIRES USER ACTION (already done):
+              ✓ OPENAI_API_KEY set in /app/backend/.env
+              ✓ /app/supabase/usage_quotas_schema.sql executed in Supabase SQL editor
+                (creates usage_quotas table keyed on (user_id, day_local DATE), RLS allows the user
+                 to SELECT their own row; backend writes via service role).
+
+  - task: "Voice + Scan UI (AddItemSheet) + editable preview + quota chip"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/AddItemSheet.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            AddItemSheet now hosts both real voice recording (expo-av, max 30s, live timer)
+            and a scan button (camera + gallery via expo-image-picker, on-device compress via
+            expo-image-manipulator). Both flows hit the new /api/ai/* endpoints, then open the new
+            ItemPreviewModal where every parsed item is fully editable (name / qty / unit / price)
+            and dupes against the active list are flagged. Bottom-of-sheet usage chip shows
+            "remaining/limit" for both voice and scan, refreshed from /api/ai/usage on open.
+            Permissions: NSMicrophoneUsageDescription / NSCameraUsageDescription /
+            NSPhotoLibraryUsageDescription added to ios.infoPlist; READ_MEDIA_IMAGES added to
+            android.permissions in app.json.
+            NOTE: Voice + Scan only work on iOS / Android — tapping on web shows a friendly
+            "open Listorix on your phone" alert.

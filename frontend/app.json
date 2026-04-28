@@ -14,7 +14,8 @@
       "associatedDomains": ["applinks:listorix.com"],
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Add items to your list using your voice",
-        "NSCameraUsageDescription": "Scan receipts to auto-log your expenses"
+        "NSCameraUsageDescription": "Scan receipts to auto-log your expenses",
+        "NSPhotoLibraryUsageDescription": "Pick a receipt or screenshot to extract items"
       }
     },
     "android": {
@@ -27,7 +28,8 @@
       "permissions": [
         "NOTIFICATIONS",
         "RECORD_AUDIO",
-        "CAMERA"
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
       ],
       "intentFilters": [
         {

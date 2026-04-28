@@ -15,6 +15,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 # Import after load_dotenv so env vars are available
 from notifications import router as notifications_router  # noqa: E402
+from ai import router as ai_router  # noqa: E402
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -57,6 +58,7 @@ async def get_status_checks():
 # Include the router in the main app
 app.include_router(api_router)
 app.include_router(notifications_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

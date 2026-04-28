@@ -1,12 +1,20 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Modal, Animated, KeyboardAvoidingView, Platform, Pressable, Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { ColorScheme, SHADOWS } from '../constants/theme';
 import { useTheme } from '../store/settings';
 import { ShoppingItem, CATEGORIES } from '../data/mockData';
+import { transcribeVoice, scanReceipt, fetchUsageToday, UsageToday, ParsedItem, QuotaError } from '../api/ai';
+import ItemPreviewModal, { PreviewSource } from './ItemPreviewModal';
+
+const VOICE_MAX_SECONDS = 30;
 
 interface Props {
   visible: boolean;
@@ -15,6 +23,8 @@ interface Props {
   onAdd?: (item: ShoppingItem) => void;
   listLabel?: string;
   listType?: 'personal' | 'family';
+  /** Names already in the active list — used to flag duplicates in the AI preview */
+  existingNames?: string[];
 }
 
 function detectCategory(name: string) {
@@ -45,7 +55,7 @@ function parseItems(raw: string): string[] {
     .filter(s => s.length > 0);
 }
 
-export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listType, listLabel }: Props) {
+export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listType, listLabel, existingNames = [] }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -57,6 +67,17 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
   const [isMultiline, setIsMultiline] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // AI flow state
+  const [usage, setUsage] = useState<UsageToday | null>(null);
+  const [aiBusy, setAiBusy] = useState<null | 'voice' | 'scan'>(null);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [previewItems, setPreviewItems] = useState<ParsedItem[]>([]);
+  const [previewSource, setPreviewSource] = useState<PreviewSource | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const itemsParsed = useMemo(() => parseItems(itemName), [itemName]);
   const itemCount = itemsParsed.length;
 
@@ -67,10 +88,17 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
       setIsRecording(false);
       setIsMultiline(false);
       setSubmitting(false);
+      setRecSeconds(0);
+      setAiBusy(null);
       slideAnim.setValue(0); // appear immediately
       // Focus on next tick so keyboard rises with the modal animation
       const id = setTimeout(() => inputRef.current?.focus(), 50);
+      // Pull today's usage from backend (best-effort)
+      fetchUsageToday().then(u => setUsage(u)).catch(() => {});
       return () => clearTimeout(id);
+    } else {
+      // sheet closed mid-recording? clean up.
+      stopAndDiscardRecording();
     }
   }, [visible]);
 
@@ -114,18 +142,223 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
     }
   };
 
-  const handleVoice = () => {
-    if (isRecording) {
-      setIsRecording(false);
-    } else {
+  // ---- Voice flow (real recording → backend transcribe + parse) ----
+  const stopAndDiscardRecording = useCallback(async () => {
+    if (recTimerRef.current) { clearInterval(recTimerRef.current); recTimerRef.current = null; }
+    if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
+    const rec = recordingRef.current;
+    recordingRef.current = null;
+    if (rec) {
+      try { await rec.stopAndUnloadAsync(); } catch { /* ignore */ }
+    }
+    setIsRecording(false);
+    setRecSeconds(0);
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Voice on mobile only', 'Voice add works on iOS/Android. Open Listorix on your phone to try it.');
+      return;
+    }
+    if (usage && usage.voice_remaining <= 0) {
+      Alert.alert('Daily limit reached', `You've used all ${usage.voice_limit} voice attempts today. Try again tomorrow.`);
+      return;
+    }
+    try {
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Microphone permission needed', 'Please grant mic access in your device settings to add by voice.');
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
       setIsRecording(true);
-      setTimeout(() => {
-        setIsRecording(false);
-        setItemName(prev => (prev ? prev + '\n' : '') + 'Amul Milk 1L');
-        setIsMultiline(true);
-      }, 1800);
+      setRecSeconds(0);
+      // Live timer
+      recTimerRef.current = setInterval(() => {
+        setRecSeconds(s => s + 1);
+      }, 1000);
+      // Auto-stop after VOICE_MAX_SECONDS
+      autoStopRef.current = setTimeout(() => {
+        stopRecordingAndProcess().catch(() => {});
+      }, VOICE_MAX_SECONDS * 1000);
+    } catch (e: any) {
+      setIsRecording(false);
+      Alert.alert('Could not record', e?.message ?? 'Please try again.');
+    }
+  }, [usage]);
+
+  const stopRecordingAndProcess = useCallback(async () => {
+    if (recTimerRef.current) { clearInterval(recTimerRef.current); recTimerRef.current = null; }
+    if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
+    const rec = recordingRef.current;
+    recordingRef.current = null;
+    if (!rec) { setIsRecording(false); return; }
+    setIsRecording(false);
+    let uri: string | null = null;
+    try {
+      await rec.stopAndUnloadAsync();
+      uri = rec.getURI();
+    } catch {
+      uri = null;
+    }
+    setRecSeconds(0);
+    if (!uri) return;
+
+    setAiBusy('voice');
+    try {
+      const result = await transcribeVoice(uri, Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4');
+      if (result.usage) {
+        setUsage(u => u ? ({ ...u, voice_count: result.usage.voice_count, voice_remaining: Math.max(u.voice_limit - result.usage.voice_count, 0) }) : u);
+      }
+      if (!result.is_shopping_intent || result.items.length === 0) {
+        const reason = result.rejection_reason || 'unrelated';
+        const msg =
+          reason === 'song' || reason === 'music' ? "That sounded like music \u2014 we couldn't extract any items."
+          : reason === 'silence' ? "We didn't catch any speech. Try again closer to the mic."
+          : reason === 'gibberish' ? "Hmm, that didn't sound like a list. Try saying item names clearly."
+          : "We couldn't detect a shopping list in what you said.";
+        Alert.alert('Voice not recognized', msg);
+        return;
+      }
+      setPreviewSource({ kind: 'voice', transcript: result.transcript });
+      setPreviewItems(result.items);
+      setPreviewVisible(true);
+    } catch (e: any) {
+      if (e instanceof QuotaError) {
+        Alert.alert('Daily limit reached', e.detail?.message || 'Try again tomorrow.');
+      } else {
+        Alert.alert('Voice failed', e?.message ?? 'Please try again.');
+      }
+    } finally {
+      setAiBusy(null);
+    }
+  }, []);
+
+  const handleVoice = () => {
+    if (aiBusy) return;
+    if (isRecording) {
+      stopRecordingAndProcess().catch(() => {});
+    } else {
+      startRecording().catch(() => {});
     }
   };
+
+  // ---- Scan flow (camera or gallery → vision → preview) ----
+  const handleScan = useCallback(async () => {
+    if (aiBusy || isRecording) return;
+    if (Platform.OS === 'web') {
+      Alert.alert('Scan on mobile only', 'Open Listorix on your phone to scan bills and screenshots.');
+      return;
+    }
+    if (usage && usage.scan_remaining <= 0) {
+      Alert.alert('Daily limit reached', `You've used all ${usage.scan_limit} scans today. Try again tomorrow.`);
+      return;
+    }
+    Alert.alert(
+      'Add by scan',
+      'Choose how to capture',
+      [
+        { text: 'Camera', onPress: () => pickAndScan('camera') },
+        { text: 'Photo library', onPress: () => pickAndScan('library') },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }, [aiBusy, isRecording, usage]);
+
+  const pickAndScan = useCallback(async (mode: 'camera' | 'library') => {
+    try {
+      let res: ImagePicker.ImagePickerResult;
+      if (mode === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Camera permission needed', 'Please grant camera access.');
+          return;
+        }
+        res = await ImagePicker.launchCameraAsync({ quality: 0.85, exif: false });
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Photo permission needed', 'Please grant photo library access.');
+          return;
+        }
+        res = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.85, exif: false,
+        });
+      }
+      if (res.canceled || !res.assets?.length) return;
+      const asset = res.assets[0];
+
+      // Compress on-device first (resize to 1600px long edge, JPEG q=0.8)
+      let uri = asset.uri;
+      try {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1600 } }],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        uri = manipulated.uri;
+      } catch {
+        // fall back to original
+      }
+
+      setAiBusy('scan');
+      const result = await scanReceipt(uri, 'image/jpeg');
+      if (result.usage) {
+        setUsage(u => u ? ({ ...u, scan_count: result.usage.scan_count, scan_remaining: Math.max(u.scan_limit - result.usage.scan_count, 0) }) : u);
+      }
+      if (!result.items.length) {
+        Alert.alert('No items found', "We couldn't read any items from that image. Try a clearer shot or a different one.");
+        return;
+      }
+      setPreviewSource({ kind: 'scan', source: result.source });
+      setPreviewItems(result.items);
+      setPreviewVisible(true);
+    } catch (e: any) {
+      if (e instanceof QuotaError) {
+        Alert.alert('Daily limit reached', e.detail?.message || 'Try again tomorrow.');
+      } else {
+        Alert.alert('Scan failed', e?.message ?? 'Please try again.');
+      }
+    } finally {
+      setAiBusy(null);
+    }
+  }, []);
+
+  // Confirm AI preview → push items into the same bulk-add path
+  const confirmAIItems = useCallback(async (items: ParsedItem[]) => {
+    if (!items.length) return;
+    setSubmitting(true);
+    try {
+      const drafts = items.map(it => {
+        // Combine quantity+unit into name suffix when meaningful
+        const qty = (it.quantity && it.quantity !== 1) ? `${it.quantity}${it.unit ? ' ' + it.unit : ''}` : (it.unit ? `${it.unit}` : '');
+        const fullName = qty ? `${it.name} (${qty})` : it.name;
+        // Map AI category to local CATEGORIES (fallback: detectCategory)
+        const cat = CATEGORIES.find(c => c.name === it.category) || detectCategory(fullName);
+        return { name: fullName, category: cat.name, emoji: it.emoji || cat.emoji, color: cat.color };
+      });
+      if (onAddBulk) {
+        await onAddBulk(drafts);
+      } else if (onAdd) {
+        drafts.forEach((d, i) => onAdd({
+          id: `item-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+          name: d.name, price: null,
+          category: d.category, categoryEmoji: d.emoji, categoryColor: d.color,
+          checked: false,
+        }));
+      }
+      onClose();
+    } catch (e: any) {
+      Alert.alert('Could not add', e?.message ?? 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [onAddBulk, onAdd, onClose]);
+
+  const handleVoiceLegacy = handleVoice; // alias preserved (in case external testIDs refer to old one)
 
   const toggleMultiline = () => {
     setIsMultiline(prev => !prev);
@@ -199,6 +432,7 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
               onPress={handleVoice}
               style={[styles.micWrap, isMultiline && styles.micWrapMultiline]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              disabled={!!aiBusy}
             >
               <Animated.View
                 style={[
@@ -207,13 +441,57 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
                   isRecording && { transform: [{ scale: pulseAnim }] },
                 ]}
               >
-                <Ionicons
-                  name={isRecording ? 'stop' : 'mic'}
-                  size={22}
-                  color={isRecording ? '#fff' : colors.primary}
-                />
+                {aiBusy === 'voice' ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Ionicons
+                    name={isRecording ? 'stop' : 'mic'}
+                    size={22}
+                    color={isRecording ? '#fff' : colors.primary}
+                  />
+                )}
               </Animated.View>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              testID="scan-btn"
+              onPress={handleScan}
+              style={[styles.micWrap, isMultiline && styles.micWrapMultiline, { paddingLeft: 6 }]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              disabled={!!aiBusy || isRecording}
+            >
+              <View style={styles.scanInner}>
+                {aiBusy === 'scan' ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Ionicons name="scan-outline" size={22} color={colors.primary} />
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Recording / quota status row */}
+          <View style={styles.statusRow}>
+            {isRecording ? (
+              <Text style={styles.recStatus} testID="rec-status">
+                ● Listening… {recSeconds}s / {VOICE_MAX_SECONDS}s
+              </Text>
+            ) : aiBusy ? (
+              <Text style={styles.recStatus}>
+                {aiBusy === 'voice' ? 'Transcribing…' : 'Reading image…'}
+              </Text>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+            {usage && (
+              <View style={styles.usagePill} testID="usage-chip">
+                <Ionicons name="mic-outline" size={11} color={colors.textSecondary} />
+                <Text style={styles.usageText}>{usage.voice_remaining}/{usage.voice_limit}</Text>
+                <View style={styles.usageDot} />
+                <Ionicons name="scan-outline" size={11} color={colors.textSecondary} />
+                <Text style={styles.usageText}>{usage.scan_remaining}/{usage.scan_limit}</Text>
+              </View>
+            )}
           </View>
 
           <Text style={styles.hint}>
@@ -235,6 +513,16 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* AI preview overlay */}
+      <ItemPreviewModal
+        visible={previewVisible}
+        source={previewSource}
+        initialItems={previewItems}
+        existingNames={existingNames}
+        onClose={() => setPreviewVisible(false)}
+        onConfirm={confirmAIItems}
+      />
     </Modal>
   );
 }
@@ -284,6 +572,24 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
     backgroundColor: colors.primaryLight,
   },
   micInnerActive: { backgroundColor: colors.secondary },
+  scanInner: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
+  },
+  statusRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    minHeight: 22, marginBottom: 6,
+  },
+  recStatus: { fontSize: 12, fontWeight: '700', color: colors.secondary },
+  usagePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+    backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+  },
+  usageText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  usageDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.border, marginHorizontal: 4 },
   hint: { fontSize: 12, color: colors.textSecondary, marginBottom: 16, textAlign: 'center', fontStyle: 'italic' },
   addBtn: { backgroundColor: colors.primary, borderRadius: 18, paddingVertical: 17, alignItems: 'center', ...SHADOWS.md },
   addBtnDisabled: { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
