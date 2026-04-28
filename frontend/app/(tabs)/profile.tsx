@@ -24,7 +24,7 @@ export default function ProfileScreen() {
   const {
     themeMode, setThemeMode,
     currency, setCurrency,
-    notificationsEnabled, setNotificationsEnabled,
+    notificationsEnabled,
     budget, setBudget,
   } = useSettings();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -33,22 +33,11 @@ export default function ProfileScreen() {
   const [budgetText, setBudgetText] = useState('');
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const handleSaveBudget = () => {
     const val = parseFloat(budgetText);
     if (!isNaN(val) && val > 0) setBudget(val);
     setShowBudgetModal(false);
-  };
-
-  const handleNotifToggle = async (v: boolean) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await setNotificationsEnabled(v);
-    } finally {
-      setBusy(false);
-    }
   };
 
   const handleSendFeedback = async () => {
@@ -167,17 +156,10 @@ export default function ProfileScreen() {
             colors={colors}
             iconName="notifications-outline"
             label="Notifications"
-            sublabel={notificationsEnabled ? 'Daily reminder at 6 PM' : 'Off'}
-            right={
-              <Switch
-                testID="toggle-notifications"
-                value={notificationsEnabled}
-                onValueChange={handleNotifToggle}
-                disabled={busy}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor="#fff"
-              />
-            }
+            sublabel={notificationsEnabled ? 'Daily reminder · Smart alerts' : 'Muted'}
+            onPress={() => router.push('/notifications-settings' as any)}
+            testID="setting-notifications"
+            right={<Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
             border
           />
           <SettingRow

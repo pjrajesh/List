@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { registerForPushNotifications, unregisterCurrentPushToken } from '../lib/push';
 
 interface AuthContextValue {
   session: Session | null;
@@ -27,8 +28,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((evt, newSession) => {
       setSession(newSession);
+      // Register / unregister push tokens on session changes
+      if (evt === 'SIGNED_IN' && newSession?.user?.id) {
+        registerForPushNotifications(newSession.user.id).catch(() => {});
+      } else if (evt === 'SIGNED_OUT' && session?.user?.id) {
+        unregisterCurrentPushToken(session.user.id).catch(() => {});
+      }
+    });
+
+    // Also register on initial mount if already logged in
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user?.id) {
+        registerForPushNotifications(data.session.user.id).catch(() => {});
+      }
     });
 
     return () => {

@@ -10,9 +10,11 @@ from typing import List
 import uuid
 from datetime import datetime
 
-
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Import after load_dotenv so env vars are available
+from notifications import router as notifications_router  # noqa: E402
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -54,6 +56,7 @@ async def get_status_checks():
 
 # Include the router in the main app
 app.include_router(api_router)
+app.include_router(notifications_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

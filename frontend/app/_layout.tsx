@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SettingsProvider, useTheme } from '../src/store/settings';
 import { AuthProvider, useAuth } from '../src/store/auth';
 import { acceptInvite } from '../src/api/groups';
+import { sendPushNotification } from '../src/api/notifications';
 
 function parseInviteToken(url: string | null): string | null {
   if (!url) return null;
@@ -55,6 +56,20 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       const result = await acceptInvite(pendingInvite);
       setPendingInvite(null);
       if (result.ok) {
+        // Notify other group members that someone joined
+        if (!result.already_member && result.group_id) {
+          const display =
+            (session.user as any)?.user_metadata?.display_name ||
+            session.user?.email?.split('@')[0] ||
+            'A new member';
+          sendPushNotification({
+            event: 'member_joined',
+            title: `🎉 ${display} joined ${result.group_name ?? 'your group'}`,
+            body: `Say hi and start sharing your list together.`,
+            group_id: result.group_id,
+            data: { group_id: result.group_id },
+          });
+        }
         router.replace('/(tabs)' as any);
       }
     })();
@@ -93,6 +108,7 @@ export default function RootLayout() {
                   <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
                   <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
                   <Stack.Screen name="groups" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                  <Stack.Screen name="notifications-settings" options={{ animation: 'slide_from_right' }} />
                 </Stack>
               </NavigationGuard>
             </ThemedShell>

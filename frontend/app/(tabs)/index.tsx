@@ -19,6 +19,7 @@ import {
 } from '../../src/api/items';
 import { listMyGroups, Group } from '../../src/api/groups';
 import { getSuggestions, Suggestion } from '../../src/api/suggestions';
+import { sendPushNotification } from '../../src/api/notifications';
 import { supabase } from '../../src/lib/supabase';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
@@ -153,8 +154,19 @@ export default function HomeScreen() {
   const allItems = [...unchecked, ...checked];
 
   const toggleItem = useCallback(async (item: RemoteItem) => {
-    await updateItem(item.id, { checked: !item.checked });
-  }, []);
+    const willBeChecked = !item.checked;
+    await updateItem(item.id, { checked: willBeChecked });
+    // Notify other group members when an item is checked off (not on un-check)
+    if (willBeChecked && currentGroupId) {
+      sendPushNotification({
+        event: 'item_checked',
+        title: `✓ ${item.name} checked off`,
+        body: `${user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Someone'} checked off ${item.name} in ${group?.name ?? 'your list'}`,
+        group_id: currentGroupId,
+        data: { item_id: item.id, group_id: currentGroupId },
+      });
+    }
+  }, [currentGroupId, user, group]);
 
   const handleAddItems = useCallback(async (drafts: { name: string; category: string; emoji: string; color: string; }[]) => {
     try {
@@ -165,11 +177,23 @@ export default function HomeScreen() {
         color: d.color,
         price: null,
       })));
+      // Notify other group members when items are added to a shared group
+      if (currentGroupId && drafts.length > 0) {
+        const previewName = drafts[0].name;
+        const more = drafts.length > 1 ? ` and ${drafts.length - 1} more` : '';
+        sendPushNotification({
+          event: 'item_added',
+          title: `New item${drafts.length > 1 ? 's' : ''} in ${group?.name ?? 'your list'}`,
+          body: `${user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Someone'} added ${previewName}${more}`,
+          group_id: currentGroupId,
+          data: { group_id: currentGroupId, count: drafts.length },
+        });
+      }
     } catch (e: any) {
       Alert.alert('Could not add', e?.message ?? 'Please try again.');
       throw e;
     }
-  }, [scope]);
+  }, [scope, currentGroupId, user, group]);
 
   const handleSavePrice = useCallback(async () => {
     if (!priceItem || !priceText) return;

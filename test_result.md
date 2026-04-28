@@ -255,3 +255,44 @@ agent_communication:
 
         PENDING VERIFICATION:
         - Full signup → invite → accept flow end-to-end (needs user to run schema.sql first)
+
+
+backend:
+  - task: "Remote Push Notifications via Expo Push API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/notifications.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Built FastAPI router /api/notifications/send + /api/notifications/health.
+            Reads device_tokens & notification_preferences from Supabase using SUPABASE_SERVICE_ROLE_KEY.
+            Resolves audience (group members minus sender), filters by mute / per-event toggle / quiet hours,
+            then batches messages to Expo Push API (https://exp.host/--/api/v2/push/send).
+            JWT auth: validates Bearer token via Supabase /auth/v1/user.
+            REQUIRES USER ACTION: set SUPABASE_SERVICE_ROLE_KEY in /app/backend/.env and run
+            /app/supabase/notifications_schema.sql in Supabase SQL editor.
+
+frontend:
+  - task: "Push token registration + notification preferences UI"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/notifications-settings.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            New screen /notifications-settings with master mute, per-event toggles
+            (item_added, item_checked, member_joined, invite_received, suggestion_reminders),
+            quiet hours start/end picker, and test notification button. Profile screen now links here.
+            src/lib/push.ts registers Expo push token on auth state SIGNED_IN and stores in device_tokens.
+            src/api/notifications.ts client + preference fetch/update.
+            Hooked events: index.tsx item add/check, _layout.tsx member_joined on accept_invite.
+            NOTE: Remote push tokens require a development build — Expo Go SDK 53+ no longer supports them.

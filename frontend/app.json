@@ -57,8 +57,19 @@
         }
       ],
       "expo-web-browser",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      [
+        "expo-notifications",
+        {
+          "color": "#1E3A8A"
+        }
+      ]
     ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    },
     "experiments": {
       "typedRoutes": true
     }
