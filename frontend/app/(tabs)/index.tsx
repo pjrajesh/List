@@ -19,7 +19,8 @@ import {
 } from '../../src/api/items';
 import { listMyGroups, Group } from '../../src/api/groups';
 import { getSuggestions, Suggestion } from '../../src/api/suggestions';
-import { sendPushNotification } from '../../src/api/notifications';
+import { sendPushNotification, fetchMyPrefs } from '../../src/api/notifications';
+import { scheduleSuggestionReminderIfNeeded } from '../../src/utils/notifications';
 import { supabase } from '../../src/lib/supabase';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
@@ -87,10 +88,19 @@ export default function HomeScreen() {
       const currentNames = items.map(i => i.name);
       const sg = await getSuggestions(scope, currentNames);
       setSuggestions(sg);
+
+      // Schedule a local "smart suggestion" reminder for tomorrow morning if any are overdue
+      // (respects the user's notification preferences). Best-effort, fire-and-forget.
+      if (user?.id) {
+        fetchMyPrefs(user.id).then(prefs => {
+          const enabled = !prefs.muted && !!prefs.suggestion_reminders;
+          scheduleSuggestionReminderIfNeeded(sg, enabled).catch(() => {});
+        }).catch(() => {});
+      }
     } finally {
       setSuggestLoading(false);
     }
-  }, [scope, items]);
+  }, [scope, items, user]);
 
   useEffect(() => { refreshSuggestions(); }, [refreshSuggestions]);
 
