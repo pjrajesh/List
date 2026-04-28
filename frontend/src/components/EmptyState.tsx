@@ -20,7 +20,7 @@ const QUICK_ITEMS = [
 
 interface Props {
   listType: 'personal' | 'family';
-  onAdd: (item: ShoppingItem) => void;
+  onAdd?: (item: ShoppingItem) => void;
   onOpenSheet: () => void;
 }
 
@@ -54,6 +54,7 @@ export default function EmptyState({ listType, onAdd, onOpenSheet }: Props) {
   const ring2Style = useAnimatedStyle(() => ({ transform: [{ scale: scale2.value }], opacity: 0.25 }));
 
   const handleQuickAdd = (item: typeof QUICK_ITEMS[0]) => {
+    if (!onAdd) { onOpenSheet(); return; }
     const cat = CATEGORIES.find(c => c.name === item.category) ?? CATEGORIES[0];
     onAdd({
       id: `quick-${Date.now()}-${Math.random()}`,

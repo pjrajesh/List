@@ -1,37 +1,43 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   StatusBar, Modal, TextInput, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import * as Notifications from 'expo-notifications';
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme, useSettings } from '../../src/store/settings';
+import { useAuth } from '../../src/store/auth';
 import { formatCurrency } from '../../src/utils/currency';
+import { CATEGORIES } from '../../src/data/mockData';
 import {
-  personalItems as initialPersonal,
-  familyItems as initialFamily,
-  ShoppingItem, CATEGORIES,
-} from '../../src/data/mockData';
+  RemoteItem, listItems, addItemsBulk, updateItem, deleteItem, deleteItemsByIds,
+} from '../../src/api/items';
+import { listMyGroups, Group } from '../../src/api/groups';
+import { supabase } from '../../src/lib/supabase';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
 
-type Tab = 'personal' | 'family';
-
 export default function HomeScreen() {
+  const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { currency, budget } = useSettings();
+  const { currency, budget, currentGroupId } = useSettings();
+  const { user } = useAuth();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [activeTab, setActiveTab] = useState<Tab>('personal');
-  const [personalList, setPersonalList] = useState<ShoppingItem[]>(initialPersonal);
-  const [familyList, setFamilyList] = useState<ShoppingItem[]>(initialFamily);
+  const [items, setItems] = useState<RemoteItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [group, setGroup] = useState<Group | null>(null);
+  const [groupCount, setGroupCount] = useState(0);
+
   const [showSheet, setShowSheet] = useState(false);
-  const [priceItem, setPriceItem] = useState<ShoppingItem | null>(null);
+  const [priceItem, setPriceItem] = useState<RemoteItem | null>(null);
   const [priceText, setPriceText] = useState('');
-  const [editItem, setEditItem] = useState<ShoppingItem | null>(null);
+  const [editItem, setEditItem] = useState<RemoteItem | null>(null);
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editCategory, setEditCategory] = useState(CATEGORIES[0]);
@@ -39,44 +45,109 @@ export default function HomeScreen() {
 
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  const items = activeTab === 'personal' ? personalList : familyList;
-  const setItems = useCallback(
-    (updater: (prev: ShoppingItem[]) => ShoppingItem[]) => {
-      if (activeTab === 'personal') setPersonalList(updater);
-      else setFamilyList(updater);
-    },
-    [activeTab]
+  const scope = useMemo(() =>
+    currentGroupId ? { groupId: currentGroupId } : { personal: true as const },
+    [currentGroupId]
   );
 
-  const totalSpent = items.filter(i => i.price !== null).reduce((sum, i) => sum + (i.price || 0), 0);
+  // Load items + groups
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [list, groups] = await Promise.all([
+        listItems(scope),
+        listMyGroups(),
+      ]);
+      setItems(list);
+      setGroupCount(groups.length);
+      if (currentGroupId) {
+        setGroup(groups.find(g => g.id === currentGroupId) ?? null);
+      } else {
+        setGroup(null);
+      }
+    } catch {
+      // RLS or not authed
+    } finally {
+      setLoading(false);
+    }
+  }, [scope, currentGroupId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+    const channelName = currentGroupId ? `items:group:${currentGroupId}` : `items:personal:${user.id}`;
+    const filter = currentGroupId
+      ? `group_id=eq.${currentGroupId}`
+      : `owner_id=eq.${user.id}`;
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const row = payload.new as RemoteItem;
+          setItems(prev => {
+            if (prev.some(p => p.id === row.id)) return prev;
+            return [...prev, row];
+          });
+          // Local notification when someone ELSE added
+          if (row.created_by !== user.id && currentGroupId) {
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: `New item in ${group?.name ?? 'your group'}`,
+                body: `${row.name} was just added`,
+              },
+              trigger: null,
+            }).catch(() => {});
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const row = payload.new as RemoteItem;
+          setItems(prev => prev.map(p => p.id === row.id ? row : p));
+        } else if (payload.eventType === 'DELETE') {
+          const row = payload.old as RemoteItem;
+          setItems(prev => prev.filter(p => p.id !== row.id));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, currentGroupId, group]);
+
+  const totalSpent = items.filter(i => i.price !== null).reduce((s, i) => s + (i.price || 0), 0);
   const budgetProgress = Math.min(totalSpent / budget, 1);
+  const checked = items.filter(i => i.checked);
+  const unchecked = items.filter(i => !i.checked);
+  const allItems = [...unchecked, ...checked];
 
-  const categoryMap: Record<string, number> = {};
-  items.forEach(i => { if (i.price) categoryMap[i.category] = (categoryMap[i.category] || 0) + i.price; });
-  const topCategory = Object.entries(categoryMap).sort((a, b) => b[1] - a[1])[0];
+  const toggleItem = useCallback(async (item: RemoteItem) => {
+    await updateItem(item.id, { checked: !item.checked });
+  }, []);
 
-  const toggleItem = useCallback((id: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked } : i));
-  }, [setItems]);
+  const handleAddItems = useCallback(async (drafts: { name: string; category: string; emoji: string; color: string; }[]) => {
+    await addItemsBulk(scope, drafts.map(d => ({
+      name: d.name,
+      category: d.category,
+      emoji: d.emoji,
+      color: d.color,
+      price: null,
+    })));
+  }, [scope]);
 
-  const handleAddItem = useCallback((item: ShoppingItem) => {
-    setItems(prev => [...prev, item]);
-  }, [setItems]);
-
-  const handleSavePrice = useCallback(() => {
+  const handleSavePrice = useCallback(async () => {
     if (!priceItem || !priceText) return;
     const price = parseFloat(priceText);
     if (isNaN(price)) return;
-    setItems(prev => prev.map(i => i.id === priceItem.id ? { ...i, price } : i));
+    await updateItem(priceItem.id, { price });
     setPriceItem(null);
     setPriceText('');
-  }, [priceItem, priceText, setItems]);
+  }, [priceItem, priceText]);
 
-  const deleteItem = useCallback((id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
-  }, [setItems]);
+  const onDeleteItem = useCallback(async (id: string) => {
+    await deleteItem(id);
+  }, []);
 
-  const openEdit = useCallback((item: ShoppingItem) => {
+  const openEdit = useCallback((item: RemoteItem) => {
     const cat = CATEGORIES.find(c => c.name === item.category) ?? CATEGORIES[0];
     setEditItem(item);
     setEditName(item.name);
@@ -85,113 +156,102 @@ export default function HomeScreen() {
     swipeableRefs.current.get(item.id)?.close();
   }, []);
 
-  const handleEditSave = useCallback(() => {
+  const handleEditSave = useCallback(async () => {
     if (!editItem || !editName.trim()) return;
     const parsedPrice = editPrice ? parseFloat(editPrice) : null;
-    setItems(prev => prev.map(i =>
-      i.id === editItem.id ? {
-        ...i,
-        name: editName.trim(),
-        price: parsedPrice !== null && !isNaN(parsedPrice) ? parsedPrice : null,
-        category: editCategory.name,
-        categoryEmoji: editCategory.emoji,
-        categoryColor: editCategory.color,
-      } : i
-    ));
+    await updateItem(editItem.id, {
+      name: editName.trim(),
+      price: parsedPrice !== null && !isNaN(parsedPrice) ? parsedPrice : null,
+      category: editCategory.name,
+      emoji: editCategory.emoji,
+      color: editCategory.color,
+    });
     setEditItem(null);
-  }, [editItem, editName, editPrice, editCategory, setItems]);
+  }, [editItem, editName, editPrice, editCategory]);
 
-  const clearChecked = useCallback(() => {
-    setItems(prev => prev.filter(i => !i.checked));
+  const clearChecked = useCallback(async () => {
+    const ids = items.filter(i => i.checked).map(i => i.id);
+    await deleteItemsByIds(ids);
     setShowListOptions(false);
-  }, [setItems]);
+  }, [items]);
 
-  const clearAll = useCallback(() => {
-    setItems(() => []);
+  const clearAll = useCallback(async () => {
+    await deleteItemsByIds(items.map(i => i.id));
     setShowListOptions(false);
-  }, [setItems]);
-
-  const checkedCount = items.filter(i => i.checked).length;
-  const unchecked = items.filter(i => !i.checked);
-  const checked = items.filter(i => i.checked);
-  const allItems = [...unchecked, ...checked];
+  }, [items]);
 
   const renderRightActions = (itemId: string) => (
-    <TouchableOpacity
-      testID={`delete-action-${itemId}`}
-      style={styles.deleteAction}
-      onPress={() => deleteItem(itemId)}
-    >
+    <TouchableOpacity testID={`delete-action-${itemId}`} style={styles.deleteAction} onPress={() => onDeleteItem(itemId)}>
       <Ionicons name="trash-outline" size={22} color="#fff" />
       <Text style={styles.deleteActionText}>Delete</Text>
     </TouchableOpacity>
   );
 
-  const renderLeftActions = (item: ShoppingItem) => (
-    <TouchableOpacity
-      testID={`edit-action-${item.id}`}
-      style={styles.editAction}
-      onPress={() => openEdit(item)}
-    >
+  const renderLeftActions = (item: RemoteItem) => (
+    <TouchableOpacity testID={`edit-action-${item.id}`} style={styles.editAction} onPress={() => openEdit(item)}>
       <Ionicons name="pencil-outline" size={22} color="#fff" />
       <Text style={styles.editActionText}>Edit</Text>
     </TouchableOpacity>
   );
 
-  const renderItem = ({ item }: { item: ShoppingItem }) => (
+  const renderItem = ({ item }: { item: RemoteItem }) => (
     <View style={styles.itemWrapper}>
-    <Swipeable
-      ref={ref => {
-        if (ref) swipeableRefs.current.set(item.id, ref);
-        else swipeableRefs.current.delete(item.id);
-      }}
-      renderRightActions={() => renderRightActions(item.id)}
-      renderLeftActions={() => renderLeftActions(item)}
-      rightThreshold={60}
-      leftThreshold={60}
-      friction={2}
-      overshootLeft={false}
-      overshootRight={false}
-    >
-      <TouchableOpacity
-        testID={`item-row-${item.id}`}
-        style={[styles.itemRow, item.checked && styles.itemRowChecked]}
-        onPress={() => toggleItem(item.id)}
-        onLongPress={() => openEdit(item)}
-        activeOpacity={0.75}
-        delayLongPress={400}
+      <Swipeable
+        ref={ref => { if (ref) swipeableRefs.current.set(item.id, ref); else swipeableRefs.current.delete(item.id); }}
+        renderRightActions={() => renderRightActions(item.id)}
+        renderLeftActions={() => renderLeftActions(item)}
+        rightThreshold={60} leftThreshold={60} friction={2} overshootLeft={false} overshootRight={false}
       >
-        <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
-          {item.checked && <Ionicons name="checkmark" size={15} color="#fff" />}
-        </View>
-        <View style={styles.itemInfo}>
-          <Text style={[styles.itemName, item.checked && styles.itemNameChecked]} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <View style={[styles.categoryChip, { backgroundColor: item.categoryColor }]}>
-            <Text style={styles.categoryText}>{item.categoryEmoji} {item.category}</Text>
+        <TouchableOpacity
+          testID={`item-row-${item.id}`}
+          style={[styles.itemRow, item.checked && styles.itemRowChecked]}
+          onPress={() => toggleItem(item)}
+          onLongPress={() => openEdit(item)}
+          activeOpacity={0.75} delayLongPress={400}
+        >
+          <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
+            {item.checked && <Ionicons name="checkmark" size={15} color="#fff" />}
           </View>
-        </View>
-        {item.price !== null ? (
-          <Text style={[styles.itemPrice, item.checked && styles.itemPriceMuted]}>
-            {formatCurrency(item.price, currency)}
-          </Text>
-        ) : (
-          <TouchableOpacity
-            testID={`add-price-${item.id}`}
-            style={styles.addPriceBtn}
-            onPress={() => { setPriceItem(item); setPriceText(''); }}
-          >
-            <Text style={styles.addPriceText}>+ Price</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    </Swipeable>
+          <View style={styles.itemInfo}>
+            <Text style={[styles.itemName, item.checked && styles.itemNameChecked]} numberOfLines={1}>{item.name}</Text>
+            {item.category && (
+              <View style={[styles.categoryChip, { backgroundColor: item.color || colors.primaryLight }]}>
+                <Text style={styles.categoryText}>{item.emoji} {item.category}</Text>
+              </View>
+            )}
+          </View>
+          {item.price !== null ? (
+            <Text style={[styles.itemPrice, item.checked && styles.itemPriceMuted]}>{formatCurrency(item.price, currency)}</Text>
+          ) : (
+            <TouchableOpacity testID={`add-price-${item.id}`} style={styles.addPriceBtn} onPress={() => { setPriceItem(item); setPriceText(''); }}>
+              <Text style={styles.addPriceText}>+ Price</Text>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      </Swipeable>
     </View>
   );
 
+  const listLabel = currentGroupId ? (group ? `${group.emoji}  ${group.name}` : 'Shared list') : '🔒  Personal';
+
   const ListHeader = () => (
     <>
+      <TouchableOpacity
+        testID="group-switcher-btn"
+        style={styles.switcher}
+        onPress={() => router.push('/groups' as any)}
+        activeOpacity={0.85}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.switcherLabel}>CURRENT LIST</Text>
+          <Text style={styles.switcherValue}>{listLabel}</Text>
+        </View>
+        <View style={styles.switcherPill}>
+          <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
+          <Text style={styles.switcherPillText}>Switch</Text>
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.budgetCard} testID="budget-card">
         <View style={styles.budgetRow}>
           <View>
@@ -211,54 +271,26 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      {topCategory && (
-        <View style={styles.insightPill} testID="insight-pill">
-          <Text style={styles.insightIcon}>💡</Text>
-          <Text style={styles.insightText}>
-            Top spend: <Text style={styles.insightBold}>{topCategory[0]}</Text> — {formatCurrency(topCategory[1], currency)}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.tabRow} testID="list-tab-toggle">
-        <TouchableOpacity
-          testID="tab-personal-btn"
-          style={[styles.tabBtn, activeTab === 'personal' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('personal')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'personal' && styles.tabBtnTextActive]}>
-            👤 Personal
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="tab-family-btn"
-          style={[styles.tabBtn, activeTab === 'family' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('family')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'family' && styles.tabBtnTextActive]}>
-            👨‍👩‍👧 Family
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.listMeta}>
         <Text style={styles.listMetaText}>
           {allItems.length} item{allItems.length !== 1 ? 's' : ''}
           {checked.length > 0 ? `  ·  ${checked.length} done ✓` : ''}
         </Text>
-        {allItems.length > 0 && (
-          <Text style={styles.swipeHint}>← edit  |  delete →</Text>
-        )}
+        {allItems.length > 0 && <Text style={styles.swipeHint}>← edit  |  delete →</Text>}
       </View>
     </>
   );
 
   const ListEmpty = () => (
-    <EmptyState
-      listType={activeTab}
-      onAdd={handleAddItem}
-      onOpenSheet={() => setShowSheet(true)}
-    />
+    loading ? (
+      <ActivityIndicator color={colors.primary} style={{ marginTop: 32 }} />
+    ) : (
+      <EmptyState
+        listType={currentGroupId ? 'family' : 'personal'}
+        onAdd={() => setShowSheet(true)}
+        onOpenSheet={() => setShowSheet(true)}
+      />
+    )
   );
 
   return (
@@ -267,14 +299,12 @@ export default function HomeScreen() {
 
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Good morning! ☀️</Text>
-          <Text style={styles.greetingSub}>Your shopping list</Text>
+          <Text style={styles.greeting}>Good day! ☀️</Text>
+          <Text style={styles.greetingSub}>
+            {groupCount > 0 ? `${groupCount + 1} list${groupCount !== 0 ? 's' : ''}` : 'Your shopping list'}
+          </Text>
         </View>
-        <TouchableOpacity
-          testID="list-options-btn"
-          style={styles.optionsBtn}
-          onPress={() => setShowListOptions(true)}
-        >
+        <TouchableOpacity testID="list-options-btn" style={styles.optionsBtn} onPress={() => setShowListOptions(true)}>
           <Ionicons name="ellipsis-horizontal" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
@@ -288,46 +318,30 @@ export default function HomeScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         testID="shopping-items-list"
+        refreshing={loading}
+        onRefresh={load}
       />
 
-      {/* Main FAB — primary add action */}
-      <TouchableOpacity
-        testID="add-item-fab"
-        style={styles.fab}
-        onPress={() => setShowSheet(true)}
-        activeOpacity={0.85}
-      >
+      <TouchableOpacity testID="add-item-fab" style={styles.fab} onPress={() => setShowSheet(true)} activeOpacity={0.85}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
       <AddItemSheet
         visible={showSheet}
         onClose={() => setShowSheet(false)}
-        onAdd={handleAddItem}
-        listType={activeTab}
+        onAddBulk={handleAddItems}
+        listLabel={listLabel}
       />
 
-      {/* Add Price Modal */}
+      {/* Price Modal */}
       <Modal visible={!!priceItem} transparent animationType="fade">
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modal} testID="price-modal">
             <Text style={styles.modalLabel}>Add price for</Text>
             <Text style={styles.modalItemName}>{priceItem?.name}</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.rupeeSign}>{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '¤'}</Text>
-              <TextInput
-                testID="price-modal-input"
-                style={styles.priceModalInput}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-                value={priceText}
-                onChangeText={setPriceText}
-                autoFocus
-                placeholderTextColor={colors.textTertiary}
-              />
+              <Text style={styles.rupeeSign}>{currency === 'INR' ? '₹' : '$'}</Text>
+              <TextInput testID="price-modal-input" style={styles.priceModalInput} placeholder="0.00" keyboardType="decimal-pad" value={priceText} onChangeText={setPriceText} autoFocus placeholderTextColor={colors.textTertiary} />
             </View>
             <View style={styles.modalBtns}>
               <TouchableOpacity testID="price-cancel-btn" style={styles.cancelBtn} onPress={() => setPriceItem(null)}>
@@ -341,69 +355,28 @@ export default function HomeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit Item Modal */}
+      {/* Edit Modal */}
       <Modal visible={!!editItem} transparent animationType="fade">
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modal} testID="edit-item-modal">
             <Text style={styles.editModalTitle}>Edit Item</Text>
-
             <Text style={styles.inputLabel}>Name</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                testID="edit-name-input"
-                style={styles.textInput}
-                value={editName}
-                onChangeText={setEditName}
-                autoFocus
-                placeholderTextColor={colors.textTertiary}
-              />
+            <View style={styles.inputRowEdit}>
+              <TextInput testID="edit-name-input" style={styles.textInput} value={editName} onChangeText={setEditName} autoFocus placeholderTextColor={colors.textTertiary} />
             </View>
-
             <Text style={styles.inputLabel}>Price</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.rupeeSign}>{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '¤'}</Text>
-              <TextInput
-                testID="edit-price-input"
-                style={styles.priceModalInput}
-                placeholder="Optional"
-                keyboardType="decimal-pad"
-                value={editPrice}
-                onChangeText={setEditPrice}
-                placeholderTextColor={colors.textTertiary}
-              />
-              {editPrice.length > 0 && (
-                <TouchableOpacity onPress={() => setEditPrice('')}>
-                  <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
+              <Text style={styles.rupeeSign}>{currency === 'INR' ? '₹' : '$'}</Text>
+              <TextInput testID="edit-price-input" style={styles.priceModalInput} placeholder="Optional" keyboardType="decimal-pad" value={editPrice} onChangeText={setEditPrice} placeholderTextColor={colors.textTertiary} />
             </View>
-
             <Text style={styles.inputLabel}>Category</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.catScroll}
-              contentContainerStyle={styles.catScrollContent}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll} contentContainerStyle={styles.catScrollContent}>
               {CATEGORIES.map(cat => (
-                <TouchableOpacity
-                  key={cat.name}
-                  testID={`edit-cat-${cat.name}`}
-                  style={[
-                    styles.catChip,
-                    { backgroundColor: cat.color },
-                    editCategory.name === cat.name && styles.catChipSelected,
-                  ]}
-                  onPress={() => setEditCategory(cat)}
-                >
+                <TouchableOpacity key={cat.name} style={[styles.catChip, { backgroundColor: cat.color }, editCategory.name === cat.name && styles.catChipSelected]} onPress={() => setEditCategory(cat)}>
                   <Text style={styles.catChipText}>{cat.emoji} {cat.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
             <View style={styles.modalBtns}>
               <TouchableOpacity testID="edit-cancel-btn" style={styles.cancelBtn} onPress={() => setEditItem(null)}>
                 <Text style={styles.cancelText}>Cancel</Text>
@@ -416,60 +389,31 @@ export default function HomeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* List Options Action Sheet */}
+      {/* List Options */}
       <Modal visible={showListOptions} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.optionsOverlay}
-          activeOpacity={1}
-          onPress={() => setShowListOptions(false)}
-        >
+        <TouchableOpacity style={styles.optionsOverlay} activeOpacity={1} onPress={() => setShowListOptions(false)}>
           <View style={styles.optionsSheet} testID="list-options-sheet">
             <View style={styles.optionsHandle} />
             <Text style={styles.optionsTitle}>List Options</Text>
-
-            <TouchableOpacity
-              testID="clear-checked-btn"
-              style={[styles.optionRow, checkedCount === 0 && styles.optionRowDisabled]}
-              onPress={clearChecked}
-              disabled={checkedCount === 0}
-            >
+            <TouchableOpacity testID="clear-checked-btn" style={[styles.optionRow, checked.length === 0 && { opacity: 0.4 }]} onPress={clearChecked} disabled={checked.length === 0}>
               <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
                 <Ionicons name="checkmark-done-outline" size={20} color={colors.primary} />
               </View>
-              <View style={styles.optionTextBlock}>
-                <Text style={[styles.optionLabel, checkedCount === 0 && styles.optionLabelDisabled]}>
-                  Clear checked items
-                </Text>
-                <Text style={styles.optionSubLabel}>
-                  {checkedCount > 0 ? `Remove ${checkedCount} done item${checkedCount !== 1 ? 's' : ''}` : 'No checked items'}
-                </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionLabel}>Clear checked items</Text>
+                <Text style={styles.optionSub}>{checked.length > 0 ? `Remove ${checked.length} done` : 'No checked items'}</Text>
               </View>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              testID="clear-all-btn"
-              style={[styles.optionRow, allItems.length === 0 && styles.optionRowDisabled]}
-              onPress={clearAll}
-              disabled={allItems.length === 0}
-            >
+            <TouchableOpacity testID="clear-all-btn" style={[styles.optionRow, allItems.length === 0 && { opacity: 0.4 }]} onPress={clearAll} disabled={allItems.length === 0}>
               <View style={[styles.optionIcon, { backgroundColor: colors.errorLight }]}>
                 <Ionicons name="trash-outline" size={20} color={colors.error} />
               </View>
-              <View style={styles.optionTextBlock}>
-                <Text style={[styles.optionLabel, { color: colors.error }, allItems.length === 0 && styles.optionLabelDisabled]}>
-                  Clear entire list
-                </Text>
-                <Text style={styles.optionSubLabel}>
-                  {allItems.length > 0 ? `Remove all ${allItems.length} items` : 'List is already empty'}
-                </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.optionLabel, { color: colors.error }]}>Clear entire list</Text>
+                <Text style={styles.optionSub}>{allItems.length > 0 ? `Remove all ${allItems.length} items` : 'List is empty'}</Text>
               </View>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              testID="options-cancel-btn"
-              style={styles.optionsCancelBtn}
-              onPress={() => setShowListOptions(false)}
-            >
+            <TouchableOpacity style={styles.optionsCancelBtn} onPress={() => setShowListOptions(false)}>
               <Text style={styles.optionsCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -481,66 +425,33 @@ export default function HomeScreen() {
 
 const createStyles = (colors: ColorScheme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   greeting: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
   greetingSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '500' },
-  optionsBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
-    ...SHADOWS.sm,
-  },
-  listContent: { paddingHorizontal: 16, paddingBottom: 90 },
-  budgetCard: {
-    backgroundColor: colors.primary, borderRadius: 24, padding: 20,
-    marginBottom: 12, marginTop: 8, ...SHADOWS.md,
-  },
+  optionsBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
+  listContent: { paddingHorizontal: 16, paddingBottom: 120 },
+  switcher: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 18, padding: 14, marginTop: 8, marginBottom: 12, ...SHADOWS.sm },
+  switcherLabel: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.8, textTransform: 'uppercase' },
+  switcherValue: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
+  switcherPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.primaryLight, borderRadius: 20 },
+  switcherPillText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  budgetCard: { backgroundColor: colors.primary, borderRadius: 24, padding: 20, marginBottom: 16, ...SHADOWS.md },
   budgetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   budgetLabel: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
-  budgetAmount: { fontSize: 44, fontWeight: '900', color: '#fff', letterSpacing: -2, marginTop: 2 },
+  budgetAmount: { fontSize: 42, fontWeight: '900', color: '#fff', letterSpacing: -2, marginTop: 2 },
   budgetRight: { alignItems: 'flex-end' },
   budgetLimitLabel: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
   budgetLimit: { fontSize: 18, fontWeight: '700', color: '#fff', marginTop: 2 },
   progressBg: { height: 10, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 99, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#fff', borderRadius: 99 },
+  progressFill: { height: '100%', backgroundColor: colors.secondary, borderRadius: 99 },
   progressHint: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 8, fontWeight: '500' },
-  insightPill: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.secondaryLight, borderRadius: 16,
-    padding: 14, marginBottom: 16, gap: 10,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  insightIcon: { fontSize: 20 },
-  insightText: { flex: 1, fontSize: 14, color: colors.textPrimary, lineHeight: 20, fontWeight: '500' },
-  insightBold: { fontWeight: '800' },
-  tabRow: {
-    flexDirection: 'row', backgroundColor: colors.surface,
-    borderRadius: 16, padding: 4, marginBottom: 12, ...SHADOWS.sm,
-  },
-  tabBtn: { flex: 1, paddingVertical: 11, borderRadius: 12, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: colors.primary },
-  tabBtnText: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
-  tabBtnTextActive: { color: '#fff' },
   listMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   listMetaText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
   swipeHint: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' },
-  itemWrapper: {
-    marginBottom: 8, borderRadius: 18, overflow: 'hidden',
-    backgroundColor: colors.surface,
-    elevation: 2,
-  },
-  itemRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, padding: 14, gap: 12,
-  },
+  itemWrapper: { marginBottom: 8, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.surface, elevation: 2 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: 14, gap: 12 },
   itemRowChecked: { opacity: 0.6 },
-  checkbox: {
-    width: 28, height: 28, borderRadius: 14,
-    borderWidth: 2, borderColor: colors.borderStrong,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  checkbox: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: colors.success, borderColor: colors.success },
   itemInfo: { flex: 1, gap: 5 },
   itemName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
@@ -551,90 +462,40 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   itemPriceMuted: { color: colors.textSecondary, fontWeight: '400' },
   addPriceBtn: { backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
   addPriceText: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  deleteAction: {
-    backgroundColor: colors.error, justifyContent: 'center', alignItems: 'center',
-    width: 80, gap: 4,
-  },
+  deleteAction: { backgroundColor: colors.error, justifyContent: 'center', alignItems: 'center', width: 80, gap: 4 },
   deleteActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-  editAction: {
-    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
-    width: 80, gap: 4,
-  },
+  editAction: { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', width: 80, gap: 4 },
   editActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-  fab: {
-    position: 'absolute', bottom: 20, right: 20,
-    width: 58, height: 58, borderRadius: 29,
-    backgroundColor: colors.secondary,
-    alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg,
-  },
-  modalOverlay: {
-    flex: 1, backgroundColor: colors.modalBackdrop,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  modal: {
-    backgroundColor: colors.surface, borderRadius: 28,
-    padding: 24, width: '90%', ...SHADOWS.lg,
-  },
+  fab: { position: 'absolute', bottom: 100, right: 20, width: 58, height: 58, borderRadius: 29, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg },
+  modalOverlay: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'center', alignItems: 'center' },
+  modal: { backgroundColor: colors.surface, borderRadius: 28, padding: 24, width: '90%', ...SHADOWS.lg },
   modalLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '500', marginBottom: 4 },
   modalItemName: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 20 },
   editModalTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginBottom: 18 },
   inputLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
-  inputRow: {
-    backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14,
-    paddingVertical: 12, marginBottom: 16, borderWidth: 2, borderColor: colors.primary,
-  },
+  inputRowEdit: { backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 16, borderWidth: 2, borderColor: colors.primary },
   textInput: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
-  priceInputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14,
-    paddingVertical: 10, marginBottom: 16, gap: 8, borderWidth: 2, borderColor: colors.primary,
-  },
+  priceInputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16, gap: 8, borderWidth: 2, borderColor: colors.primary },
   rupeeSign: { fontSize: 22, fontWeight: '700', color: colors.primary },
   priceModalInput: { flex: 1, fontSize: 24, fontWeight: '700', color: colors.textPrimary, padding: 0 },
   catScroll: { marginBottom: 20 },
   catScrollContent: { gap: 8, paddingRight: 8 },
-  catChip: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12,
-    paddingVertical: 8, borderRadius: 20, gap: 4,
-    borderWidth: 2, borderColor: 'transparent',
-  },
+  catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, gap: 4, borderWidth: 2, borderColor: 'transparent' },
   catChipSelected: { borderColor: colors.primary },
   catChipText: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
   modalBtns: { flexDirection: 'row', gap: 12 },
-  cancelBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 14,
-    backgroundColor: colors.inputBg, alignItems: 'center',
-    borderWidth: 1, borderColor: colors.border,
-  },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.inputBg, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   cancelText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
   saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center' },
   saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   optionsOverlay: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'flex-end' },
-  optionsSheet: {
-    backgroundColor: colors.surface, borderTopLeftRadius: 32,
-    borderTopRightRadius: 32, paddingHorizontal: 20, paddingBottom: 40, paddingTop: 12,
-    ...SHADOWS.lg,
-  },
-  optionsHandle: {
-    width: 44, height: 5, backgroundColor: colors.border,
-    borderRadius: 99, alignSelf: 'center', marginBottom: 20,
-  },
+  optionsSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 20, paddingBottom: 40, paddingTop: 12, ...SHADOWS.lg },
+  optionsHandle: { width: 44, height: 5, backgroundColor: colors.border, borderRadius: 99, alignSelf: 'center', marginBottom: 20 },
   optionsTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 16 },
-  optionRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.inputBg, borderRadius: 18,
-    padding: 16, marginBottom: 10, gap: 14,
-  },
-  optionRowDisabled: { opacity: 0.4 },
+  optionRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBg, borderRadius: 18, padding: 16, marginBottom: 10, gap: 14 },
   optionIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  optionTextBlock: { flex: 1 },
   optionLabel: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  optionLabelDisabled: { color: colors.textSecondary },
-  optionSubLabel: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '400' },
-  optionsCancelBtn: {
-    backgroundColor: colors.surface, borderRadius: 18,
-    paddingVertical: 16, alignItems: 'center', marginTop: 4,
-    borderWidth: 1, borderColor: colors.border,
-  },
+  optionSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '400' },
+  optionsCancelBtn: { backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 16, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: colors.border },
   optionsCancelText: { fontSize: 16, fontWeight: '700', color: colors.textSecondary },
 });

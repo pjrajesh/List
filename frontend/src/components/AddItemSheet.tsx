@@ -11,8 +11,10 @@ import { ShoppingItem, CATEGORIES } from '../data/mockData';
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onAdd: (item: ShoppingItem) => void;
-  listType: 'personal' | 'family';
+  onAddBulk?: (drafts: { name: string; category: string; emoji: string; color: string }[]) => Promise<void> | void;
+  onAdd?: (item: ShoppingItem) => void; // legacy fallback
+  listLabel?: string;
+  listType?: 'personal' | 'family';
 }
 
 // Keyword-based category auto-detection
@@ -45,7 +47,7 @@ function parseItems(raw: string): string[] {
     .filter(s => s.length > 0);
 }
 
-export default function AddItemSheet({ visible, onClose, onAdd, listType }: Props) {
+export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listType, listLabel }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -89,20 +91,22 @@ export default function AddItemSheet({ visible, onClose, onAdd, listType }: Prop
     }
   }, [isRecording]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (itemCount === 0) return;
-    itemsParsed.forEach((name, i) => {
+    const drafts = itemsParsed.map(name => {
       const cat = detectCategory(name);
-      onAdd({
-        id: `item-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-        name,
-        price: null,
-        category: cat.name,
-        categoryEmoji: cat.emoji,
-        categoryColor: cat.color,
-        checked: false,
-      });
+      return { name, category: cat.name, emoji: cat.emoji, color: cat.color };
     });
+    if (onAddBulk) {
+      try { await onAddBulk(drafts); } catch {}
+    } else if (onAdd) {
+      drafts.forEach((d, i) => onAdd({
+        id: `item-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        name: d.name, price: null,
+        category: d.category, categoryEmoji: d.emoji, categoryColor: d.color,
+        checked: false,
+      }));
+    }
     onClose();
   };
 
@@ -144,7 +148,7 @@ export default function AddItemSheet({ visible, onClose, onAdd, listType }: Prop
 
           <View style={styles.headerRow}>
             <Text style={styles.listLabel}>
-              {listType === 'personal' ? '👤 Personal' : '👨‍👩‍👧 Family'} list
+              {listLabel ?? (listType === 'personal' ? '👤 Personal' : '👨‍👩‍👧 Family')} list
             </Text>
             <TouchableOpacity
               testID="multiline-toggle-btn"

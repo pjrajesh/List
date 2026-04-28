@@ -1,28 +1,43 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Listorix",
+    "slug": "listorix",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "listorix",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.listorix.app",
+      "associatedDomains": ["applinks:listorix.com"],
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Add items to your list using your voice"
+        "NSMicrophoneUsageDescription": "Add items to your list using your voice",
+        "NSCameraUsageDescription": "Scan receipts to auto-log your expenses"
       }
     },
     "android": {
+      "package": "com.listorix.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#1E3A8A"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
         "NOTIFICATIONS",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "CAMERA"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "listorix.com", "pathPrefix": "/join" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
@@ -38,7 +53,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#FAFAF7"
         }
       ],
       "expo-web-browser",

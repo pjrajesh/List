@@ -18,6 +18,7 @@ interface SettingsState {
   currency: CurrencyCode;
   notificationsEnabled: boolean;
   budget: number;
+  currentGroupId: string | null; // null = Personal
   hydrated: boolean;
 }
 
@@ -28,10 +29,10 @@ interface SettingsContextValue extends SettingsState {
   setCurrency: (c: CurrencyCode) => void;
   setNotificationsEnabled: (v: boolean) => Promise<void>;
   setBudget: (b: number) => void;
+  setCurrentGroupId: (id: string | null) => void;
 }
 
 const STORAGE_KEY = '@listorix:settings:v1';
-
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 const DEFAULT_STATE: SettingsState = {
@@ -39,6 +40,7 @@ const DEFAULT_STATE: SettingsState = {
   currency: 'INR',
   notificationsEnabled: true,
   budget: 4000,
+  currentGroupId: null,
   hydrated: false,
 };
 
@@ -46,7 +48,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [state, setState] = useState<SettingsState>(DEFAULT_STATE);
 
-  // Hydrate from AsyncStorage on mount
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -66,7 +67,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted = false; };
   }, []);
 
-  // Persist to AsyncStorage
   useEffect(() => {
     if (!state.hydrated) return;
     const { hydrated, ...persist } = state;
@@ -81,32 +81,31 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const colors = isDark ? darkColors : lightColors;
 
   const setThemeMode = useCallback((m: ThemeMode) => {
-    setState((prev) => ({ ...prev, themeMode: m }));
+    setState((p) => ({ ...p, themeMode: m }));
   }, []);
-
   const setCurrency = useCallback((c: CurrencyCode) => {
-    setState((prev) => ({ ...prev, currency: c }));
+    setState((p) => ({ ...p, currency: c }));
   }, []);
-
   const setNotificationsEnabled = useCallback(async (v: boolean) => {
     if (v) {
       const granted = await requestNotificationPermission();
       if (!granted) {
-        // Permission denied — keep toggle off
-        setState((prev) => ({ ...prev, notificationsEnabled: false }));
+        setState((p) => ({ ...p, notificationsEnabled: false }));
         return;
       }
       await scheduleShoppingReminder();
       await sendTestNotification();
-      setState((prev) => ({ ...prev, notificationsEnabled: true }));
+      setState((p) => ({ ...p, notificationsEnabled: true }));
     } else {
       await cancelAllNotifications();
-      setState((prev) => ({ ...prev, notificationsEnabled: false }));
+      setState((p) => ({ ...p, notificationsEnabled: false }));
     }
   }, []);
-
   const setBudget = useCallback((b: number) => {
-    setState((prev) => ({ ...prev, budget: b }));
+    setState((p) => ({ ...p, budget: b }));
+  }, []);
+  const setCurrentGroupId = useCallback((id: string | null) => {
+    setState((p) => ({ ...p, currentGroupId: id }));
   }, []);
 
   const value: SettingsContextValue = {
@@ -117,6 +116,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setCurrency,
     setNotificationsEnabled,
     setBudget,
+    setCurrentGroupId,
   };
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

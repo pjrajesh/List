@@ -9,6 +9,8 @@ import * as MailComposer from 'expo-mail-composer';
 import * as WebBrowser from 'expo-web-browser';
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme, useSettings } from '../../src/store/settings';
+import { useAuth } from '../../src/store/auth';
+import { useRouter } from 'expo-router';
 import { CURRENCIES, CurrencyCode, formatCurrency, getCurrencyDisplay } from '../../src/utils/currency';
 
 const SUPPORT_EMAIL = 'support@Listorix.com';
@@ -17,6 +19,8 @@ const PRIVACY_URL = 'https://listorix.com/privacy';
 
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
   const {
     themeMode, setThemeMode,
     currency, setCurrency,
@@ -111,14 +115,14 @@ export default function ProfileScreen() {
         {/* Avatar Card */}
         <View style={styles.avatarCard} testID="avatar-card">
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>P</Text>
+            <Text style={styles.avatarText}>{(user?.user_metadata?.display_name || user?.email || 'U').slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>Priya Sharma</Text>
-            <Text style={styles.userEmail}>priya@gmail.com</Text>
+            <Text style={styles.userName}>{user?.user_metadata?.display_name || (user?.email ? user.email.split('@')[0] : 'Guest')}</Text>
+            <Text style={styles.userEmail}>{user?.email || '—'}</Text>
             <View style={styles.memberBadge}>
               <Ionicons name="star" size={12} color={colors.accentYellow} />
-              <Text style={styles.memberText}>Member since Jan 2025</Text>
+              <Text style={styles.memberText}>Listorix member</Text>
             </View>
           </View>
         </View>
@@ -140,6 +144,20 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <Text style={styles.budgetHint}>Budget resets on the 1st of every month</Text>
+        </View>
+
+        {/* Groups */}
+        <Text style={styles.sectionTitle}>My Groups</Text>
+        <View style={styles.settingsSection}>
+          <SettingRow
+            colors={colors}
+            iconName="people-outline"
+            label="Manage groups"
+            sublabel="Create, invite, switch between groups"
+            onPress={() => router.push('/groups' as any)}
+            testID="setting-groups"
+            right={<Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />}
+          />
         </View>
 
         {/* Settings */}
@@ -231,7 +249,7 @@ export default function ProfileScreen() {
           style={styles.signOutBtn}
           onPress={() => Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign Out', style: 'destructive', onPress: () => {} },
+            { text: 'Sign Out', style: 'destructive', onPress: async () => { await signOut(); } },
           ])}
         >
           <Ionicons name="log-out-outline" size={20} color={colors.error} />
