@@ -18,9 +18,11 @@ import {
   RemoteItem, listItems, addItemsBulk, updateItem, deleteItem, deleteItemsByIds,
 } from '../../src/api/items';
 import { listMyGroups, Group } from '../../src/api/groups';
+import { getSuggestions, Suggestion } from '../../src/api/suggestions';
 import { supabase } from '../../src/lib/supabase';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
+import SuggestionsCarousel from '../../src/components/SuggestionsCarousel';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,6 +35,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<Group | null>(null);
   const [groupCount, setGroupCount] = useState(0);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(true);
 
   const [showSheet, setShowSheet] = useState(false);
   const [priceItem, setPriceItem] = useState<RemoteItem | null>(null);
@@ -73,6 +77,34 @@ export default function HomeScreen() {
   }, [scope, currentGroupId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Refresh suggestions whenever items list changes (so newly-added items are excluded
+  // from the carousel, and so checked-off items propagate into history).
+  const refreshSuggestions = useCallback(async () => {
+    setSuggestLoading(true);
+    try {
+      const currentNames = items.map(i => i.name);
+      const sg = await getSuggestions(scope, currentNames);
+      setSuggestions(sg);
+    } finally {
+      setSuggestLoading(false);
+    }
+  }, [scope, items]);
+
+  useEffect(() => { refreshSuggestions(); }, [refreshSuggestions]);
+
+  const handleSuggestionAdd = useCallback(async (s: Suggestion) => {
+    try {
+      await addItemsBulk(scope, [{
+        name: s.name,
+        category: s.category ?? null,
+        emoji: s.emoji ?? null,
+        color: s.color ?? null,
+      }]);
+    } catch (e: any) {
+      Alert.alert('Could not add', e?.message ?? 'Please try again.');
+    }
+  }, [scope]);
 
   // Realtime subscription
   useEffect(() => {
@@ -293,6 +325,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <SuggestionsCarousel
+        suggestions={suggestions}
+        loading={suggestLoading}
+        onAdd={handleSuggestionAdd}
+        onRefresh={refreshSuggestions}
+      />
     </>
   );
 
