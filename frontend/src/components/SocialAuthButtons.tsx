@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, SHADOWS } from '../constants/theme';
 import { useTheme } from '../store/settings';
 import { signInWithProvider, isAppleAvailable } from '../api/oauth';
+import GoogleLogo from './GoogleLogo';
 
 interface Props {
   onBusyChange?: (busy: boolean) => void;
@@ -45,7 +46,7 @@ export default function SocialAuthButtons({ onBusyChange }: Props) {
             <ActivityIndicator color={colors.textPrimary} />
           ) : (
             <>
-              <GoogleIcon />
+              <GoogleLogo size={18} />
               <Text style={styles.btnText}>Google</Text>
             </>
           )}
@@ -75,12 +76,8 @@ export default function SocialAuthButtons({ onBusyChange }: Props) {
 }
 
 function GoogleIcon() {
-  // Google's multi-color 'G' — simplified using layered text (no SVG dep needed here).
-  return (
-    <View style={{ width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 16, fontWeight: '900', color: '#EA4335' }}>G</Text>
-    </View>
-  );
+  // Replaced with real GoogleLogo SVG above; kept as no-op for back-compat.
+  return null;
 }
 
 const createStyles = (colors: ColorScheme, isDark: boolean) => StyleSheet.create({

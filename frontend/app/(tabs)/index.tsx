@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   StatusBar, Modal, TextInput, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator,
+  Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -125,13 +125,18 @@ export default function HomeScreen() {
   }, []);
 
   const handleAddItems = useCallback(async (drafts: { name: string; category: string; emoji: string; color: string; }[]) => {
-    await addItemsBulk(scope, drafts.map(d => ({
-      name: d.name,
-      category: d.category,
-      emoji: d.emoji,
-      color: d.color,
-      price: null,
-    })));
+    try {
+      await addItemsBulk(scope, drafts.map(d => ({
+        name: d.name,
+        category: d.category,
+        emoji: d.emoji,
+        color: d.color,
+        price: null,
+      })));
+    } catch (e: any) {
+      Alert.alert('Could not add', e?.message ?? 'Please try again.');
+      throw e;
+    }
   }, [scope]);
 
   const handleSavePrice = useCallback(async () => {
@@ -276,7 +281,17 @@ export default function HomeScreen() {
           {allItems.length} item{allItems.length !== 1 ? 's' : ''}
           {checked.length > 0 ? `  ·  ${checked.length} done ✓` : ''}
         </Text>
-        {allItems.length > 0 && <Text style={styles.swipeHint}>← edit  |  delete →</Text>}
+        {allItems.length > 0 && (
+          <TouchableOpacity
+            testID="list-options-inline-btn"
+            onPress={() => setShowListOptions(true)}
+            style={styles.metaActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="ellipsis-horizontal" size={14} color={colors.primary} />
+            <Text style={styles.metaActionText}>Manage</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </>
   );
@@ -287,7 +302,18 @@ export default function HomeScreen() {
     ) : (
       <EmptyState
         listType={currentGroupId ? 'family' : 'personal'}
-        onAdd={() => setShowSheet(true)}
+        onAdd={async (item) => {
+          try {
+            await addItemsBulk(scope, [{
+              name: item.name,
+              category: item.category,
+              emoji: item.categoryEmoji,
+              color: item.categoryColor,
+            }]);
+          } catch (e: any) {
+            Alert.alert('Could not add', e?.message ?? 'Please try again.');
+          }
+        }}
         onOpenSheet={() => setShowSheet(true)}
       />
     )
@@ -298,15 +324,7 @@ export default function HomeScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Good day! ☀️</Text>
-          <Text style={styles.greetingSub}>
-            {groupCount > 0 ? `${groupCount + 1} list${groupCount !== 0 ? 's' : ''}` : 'Your shopping list'}
-          </Text>
-        </View>
-        <TouchableOpacity testID="list-options-btn" style={styles.optionsBtn} onPress={() => setShowListOptions(true)}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <Text style={styles.brandText}>Listorix</Text>
       </View>
 
       <FlatList
@@ -426,9 +444,9 @@ export default function HomeScreen() {
 const createStyles = (colors: ColorScheme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  greeting: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
-  greetingSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '500' },
-  optionsBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
+  brandText: { fontSize: 26, fontWeight: '900', letterSpacing: -1, color: colors.textPrimary },
+  metaActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: colors.primaryLight },
+  metaActionText: { fontSize: 12, fontWeight: '700', color: colors.primary, letterSpacing: 0.3 },
   listContent: { paddingHorizontal: 16, paddingBottom: 120 },
   switcher: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 18, padding: 14, marginTop: 8, marginBottom: 12, ...SHADOWS.sm },
   switcherLabel: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.8, textTransform: 'uppercase' },
