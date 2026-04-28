@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme } from '../../src/store/settings';
+import SocialAuthButtons from '../../src/components/SocialAuthButtons';
 
 export default function Welcome() {
   const router = useRouter();
@@ -34,8 +35,11 @@ export default function Welcome() {
           onPress={() => router.push('/(auth)/signup' as any)}
           activeOpacity={0.85}
         >
-          <Text style={styles.primaryBtnText}>Create account</Text>
+          <Text style={styles.primaryBtnText}>Continue with Email</Text>
         </TouchableOpacity>
+
+        <SocialAuthButtons />
+
         <TouchableOpacity
           testID="welcome-login-btn"
           style={styles.secondaryBtn}

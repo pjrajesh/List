@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme } from '../../src/store/settings';
 import { useAuth } from '../../src/store/auth';
+import SocialAuthButtons from '../../src/components/SocialAuthButtons';
 
 export default function LogIn() {
   const router = useRouter();
@@ -91,6 +92,8 @@ export default function LogIn() {
           >
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Log in</Text>}
           </TouchableOpacity>
+
+          <SocialAuthButtons />
 
           <TouchableOpacity
             testID="login-to-signup-btn"
