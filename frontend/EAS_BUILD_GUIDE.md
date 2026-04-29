@@ -214,7 +214,43 @@ changes on device. Common tweaks:
 - Show more or fewer items (edit `slice(0, 5)` in `sync.tsx`)
 - Adjust min size in `app.json` → `react-native-android-widget` plugin
 
-### iOS widget (not yet implemented)
-iOS WidgetKit support requires a Swift-based config plugin (~6-8 hrs of
-work). Plan: ship Android widget first → gather user feedback → then
-build iOS widget.
+### iOS widget — IMPLEMENTED (Swift + WidgetKit)
+The iOS widget is fully wired via `@bacons/apple-targets` config plugin.
+
+- **Source**: `/app/frontend/targets/widget/Widget.swift` — Swift code that the
+  config plugin adds as a WidgetKit extension target during `expo prebuild`.
+- **Sizes**: `systemSmall` (count + label) and `systemMedium` (top 5 items + Add button).
+- **Data sharing**: An **App Group** (`group.com.listorix.app.shared`) shares
+  a JSON snapshot between the main app (writes via
+  `react-native-shared-group-preferences`) and the widget extension
+  (reads via `UserDefaults(suiteName:)`).
+- **Refresh cadence**: every 30 min via `Timeline.policy(.after(...))`. The
+  widget always reads the latest snapshot from App Group on each refresh.
+- **Tap behavior**: tapping the widget body opens `listorix://list`,
+  tapping "+ Add item" opens `listorix://add`.
+
+#### One-time setup before the FIRST iOS build
+1. **Add App Group capability** in your Apple Developer portal:
+   - Apple Developer → Certificates, IDs & Profiles → Identifiers
+   - Edit your bundle ID `com.listorix.app` → enable **App Groups** capability
+   - Click **Configure** → add `group.com.listorix.app.shared` → Save
+   - **CRUCIAL**: do the same on the WIDGET bundle ID (`com.listorix.app.widget`)
+   - Both must share the same App Group identifier.
+
+2. **Run prebuild + build**:
+   ```bash
+   eas build --profile development --platform ios
+   ```
+   EAS auto-prebuilds and the `@bacons/apple-targets` plugin generates the
+   Xcode widget target. EAS handles certs/profiles for both targets.
+
+3. **After install on device**: long-press home screen → tap "+" top-left
+   → search "Listorix" → drag the widget to a home screen page.
+
+#### Troubleshooting
+- **Widget shows "Your list is empty" forever** → App Groups not configured
+  on Apple Developer for one of the two bundle IDs. See setup step 1.
+- **"Could not find module 'WidgetKit'"** during build → `deploymentTarget`
+  in `targets/widget/expo-target.config.json` must be `16.0` or higher.
+- **Widget data doesn't refresh** → iOS aggressively caches widget timelines.
+  Force-quit the app, wait 5 sec, reopen — should trigger a new timeline.

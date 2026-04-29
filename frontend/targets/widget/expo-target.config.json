@@ -1,0 +1,15 @@
+{
+  "type": "widget",
+  "name": "ListorixWidget",
+  "icon": "🛍️",
+  "colors": {
+    "$accent": "#1E3A8A",
+    "$gold": "#D4A84A"
+  },
+  "deploymentTarget": "16.0",
+  "entitlements": {
+    "com.apple.security.application-groups": [
+      "group.com.listorix.app.shared"
+    ]
+  }
+}
