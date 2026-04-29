@@ -183,3 +183,38 @@ Backend can't reach Supabase service role. Check `/api/ai/health` returns `opena
 | OTA update | `eas update --branch production` |
 | Show credentials | `eas credentials` |
 | Show project info | `eas whoami` + `eas project:info` |
+
+---
+
+## 7. Android Home-Screen Widget
+
+A 4×2 home-screen widget ("Listorix — Your List") is bundled. It shows the
+top 5 unchecked items + count + a quick "+ Add" button.
+
+**Important:** widgets only work in DEV / PREVIEW / PRODUCTION builds —
+NOT in Expo Go. They require native Android code that gets compiled in via
+the `react-native-android-widget` config plugin (already wired in app.json).
+
+### How it shows up after install
+1. After installing the dev/preview/production APK on your Android phone,
+   long-press the home screen → "Widgets" → scroll to **Listorix**.
+2. Drag the 4×2 widget onto your home screen.
+3. When you launch the app and add/check items, the widget refreshes
+   immediately. When the app is closed, the widget refreshes every 30 min
+   automatically (Android system schedule).
+
+### Tap behavior
+- Tap the widget body → opens the app to your list (`listorix://list`)
+- Tap "+ Add item" → opens the app on the list screen (`listorix://add`)
+
+### Customizing the widget UI
+Edit `/app/frontend/src/widgets/ListWidget.tsx`. Re-build with EAS to see
+changes on device. Common tweaks:
+- Change the gold/sapphire palette (constants near the top of the file)
+- Show more or fewer items (edit `slice(0, 5)` in `sync.tsx`)
+- Adjust min size in `app.json` → `react-native-android-widget` plugin
+
+### iOS widget (not yet implemented)
+iOS WidgetKit support requires a Swift-based config plugin (~6-8 hrs of
+work). Plan: ship Android widget first → gather user feedback → then
+build iOS widget.

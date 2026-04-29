@@ -2,13 +2,23 @@ import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Linking from 'expo-linking';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { SettingsProvider, useTheme } from '../src/store/settings';
 import { AuthProvider, useAuth } from '../src/store/auth';
 import { acceptInvite } from '../src/api/groups';
 import { sendPushNotification } from '../src/api/notifications';
+
+// Register Android home-screen widget task handler ASAP so it runs even
+// when the JS app is otherwise idle.
+if (Platform.OS === 'android') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { registerWidgetTaskHandler } = require('react-native-android-widget');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { widgetTaskHandler } = require('../src/widgets/widget-task-handler');
+  try { registerWidgetTaskHandler(widgetTaskHandler); } catch { /* ignore */ }
+}
 
 function parseInviteToken(url: string | null): string | null {
   if (!url) return null;

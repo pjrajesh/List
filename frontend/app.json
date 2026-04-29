@@ -65,6 +65,25 @@
         {
           "color": "#1E3A8A"
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "List",
+              "label": "Listorix \u2014 Your List",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "See your active list and quick-add at a glance.",
+              "previewImage": "./assets/images/widget-preview.png",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ],
     "extra": {

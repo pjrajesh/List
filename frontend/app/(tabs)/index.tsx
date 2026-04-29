@@ -21,6 +21,7 @@ import { listMyGroups, Group } from '../../src/api/groups';
 import { getSuggestions, Suggestion } from '../../src/api/suggestions';
 import { sendPushNotification, fetchMyPrefs } from '../../src/api/notifications';
 import { scheduleSuggestionReminderIfNeeded } from '../../src/utils/notifications';
+import { publishListToWidget } from '../../src/widgets/sync';
 import { supabase } from '../../src/lib/supabase';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
@@ -304,6 +305,14 @@ export default function HomeScreen() {
   );
 
   const listLabel = currentGroupId ? (group ? `${group.emoji}  ${group.name}` : 'Shared list') : '🔒  Personal';
+
+  // Publish list state to the Android home-screen widget whenever it changes
+  useEffect(() => {
+    publishListToWidget({
+      listLabel: currentGroupId ? (group?.name ?? 'Shared list') : 'Personal',
+      allItems: items.map(i => ({ name: i.name, emoji: (i as any).emoji ?? '🛒', checked: !!i.checked })),
+    }).catch(() => {});
+  }, [items, currentGroupId, group]);
 
   const ListHeader = () => (
     <>
