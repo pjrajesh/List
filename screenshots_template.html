@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Listorix App Store Screenshots</title>
+<style>
+  /* Reset */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  html, body { background: #000; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif; }
+
+  /* iPhone 6.9" portrait: 1290 × 2796 */
+  .frame {
+    width: 1290px;
+    height: 2796px;
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+  }
+  /* Stack frames vertically; we'll screenshot each individually by query param */
+  .frame[data-id]:not([data-active]) { display: none; }
+
+  /* === Backgrounds — Sapphire & Gold === */
+  .bg-sapphire { background: linear-gradient(165deg, #0f172a 0%, #1E3A8A 50%, #3B5BBA 100%); }
+  .bg-gold     { background: linear-gradient(165deg, #1E3A8A 0%, #7C5C24 60%, #D4A84A 100%); }
+  .bg-deep     { background: linear-gradient(165deg, #0a0f1f 0%, #1E3A8A 100%); }
+  .bg-cream    { background: linear-gradient(165deg, #FAFAF7 0%, #ECEAE0 100%); color: #0F172A; }
+
+  /* === Headline area === */
+  .headline {
+    padding: 130px 90px 0 90px;
+    text-align: center;
+  }
+  .eyebrow {
+    font-size: 36px; font-weight: 800;
+    letter-spacing: 6px; text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 24px;
+  }
+  .h1 {
+    font-size: 110px; font-weight: 900;
+    line-height: 1.05; letter-spacing: -3px;
+  }
+  .h1 .accent { color: #F4C76A; }
+  .h1.dark .accent { color: #B98C32; }
+  .sub {
+    font-size: 38px; font-weight: 500;
+    margin-top: 36px; opacity: 0.78;
+    line-height: 1.4;
+  }
+
+  /* === Phone screen (mock app inside) === */
+  .phone {
+    width: 1010px;
+    height: 1900px;
+    background: #FAFAF7;
+    border-radius: 64px;
+    margin: 80px auto 0 auto;
+    overflow: hidden;
+    position: relative;
+    color: #0F172A;
+    box-shadow: 0 60px 120px rgba(0,0,0,0.5);
+  }
+  /* Status bar */
+  .status {
+    height: 70px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 70px;
+    font-size: 26px; font-weight: 700;
+  }
+  .status-icons { display: flex; gap: 14px; align-items: center; }
+  .pill { width: 280px; height: 38px; background: #000; border-radius: 19px; }
+  .status-row { display: flex; align-items: center; justify-content: space-between; padding: 26px 70px 0 70px; }
+
+  /* === Generic UI primitives === */
+  .item {
+    display: flex; align-items: center; gap: 22px;
+    background: #fff; border-radius: 22px; padding: 26px 28px;
+    margin: 0 60px 18px 60px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  }
+  .item .emoji {
+    width: 64px; height: 64px; border-radius: 18px;
+    background: #F1F5FF; display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+  }
+  .item .check {
+    width: 36px; height: 36px; border-radius: 50%; border: 3px solid #C7D0E1;
+    flex-shrink: 0;
+  }
+  .item .check.done {
+    background: #1E3A8A; border-color: #1E3A8A;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+    background-size: 22px 22px; background-repeat: no-repeat; background-position: center;
+  }
+  .item .name { font-size: 30px; font-weight: 700; flex: 1; }
+  .item .name.checked { text-decoration: line-through; color: #94A3B8; }
+  .item .meta { font-size: 22px; color: #64748B; font-weight: 600; }
+
+  /* App header */
+  .app-header { padding: 40px 60px 24px 60px; }
+  .app-title { font-size: 48px; font-weight: 900; letter-spacing: -1px; }
+  .app-sub { font-size: 24px; color: #64748B; font-weight: 500; margin-top: 6px; }
+  .avatar-row { display: flex; gap: -10px; margin-top: 22px; }
+  .avatar-row .av { width: 56px; height: 56px; border-radius: 50%; border: 4px solid #fff; margin-left: -16px; font-size: 24px; font-weight: 800; color:#fff; display:flex; align-items:center; justify-content:center; }
+  .avatar-row .av:first-child { margin-left: 0; }
+
+  /* === SLIDE 1: Hero === */
+  .hero-list { margin-top: 30px; }
+
+  /* === SLIDE 2: Voice === */
+  .mic-card {
+    margin: 360px 80px 0 80px;
+    background: #fff; border-radius: 36px; padding: 50px 50px 60px 50px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+    color: #0F172A;
+  }
+  .mic-pulse {
+    width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, #1E3A8A 0%, #1E3A8A 60%, transparent 70%);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 30px auto;
+    position: relative;
+  }
+  .mic-pulse::before, .mic-pulse::after {
+    content: ''; position: absolute; inset: -30px;
+    border-radius: 50%; border: 4px solid #1E3A8A; opacity: 0.15;
+  }
+  .mic-pulse::after { inset: -60px; opacity: 0.08; }
+  .mic-icon {
+    width: 110px; height: 110px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z'/%3E%3Cpath d='M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 0 0 0 2h8a1 1 0 0 0 0-2h-3v-2.08A7 7 0 0 0 19 11z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-size: contain;
+  }
+  .transcript-bubble {
+    background: #F1F5FF; border-radius: 22px; padding: 30px 32px;
+    font-size: 30px; font-style: italic; color: #1E3A8A; font-weight: 600;
+    line-height: 1.4; text-align: center;
+    margin-bottom: 30px;
+  }
+  .chips { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    background: #1E3A8A; color: white;
+    padding: 16px 24px; border-radius: 20px;
+    font-size: 26px; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .chip.gold { background: #B98C32; }
+
+  /* === SLIDE 3: Scan === */
+  .scan-container { margin: 220px auto 0 auto; width: 1010px; position: relative; }
+  .receipt {
+    width: 720px; margin: 0 auto;
+    background: #FFFEF6; border-radius: 22px; padding: 56px 50px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+    transform: rotate(-3deg);
+    color: #0F172A;
+  }
+  .receipt-header { text-align: center; margin-bottom: 30px; }
+  .receipt-logo { font-size: 32px; font-weight: 900; color: #5C3DC4; letter-spacing: -1px; }
+  .receipt-meta { font-size: 18px; color: #64748B; margin-top: 4px; }
+  .receipt-line { display: flex; justify-content: space-between; padding: 16px 0; border-bottom: 1px dashed #CBD5E1; font-size: 24px; }
+  .receipt-line.tot { border: 0; font-weight: 800; padding-top: 24px; font-size: 28px; }
+  .scan-output {
+    margin: -200px 60px 0 60px;
+    background: #fff; border-radius: 30px; padding: 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    transform: rotate(2deg);
+    color: #0F172A;
+    border: 4px solid #B98C32;
+    position: relative;
+    z-index: 2;
+  }
+  .scan-output .label {
+    background: #B98C32; color: white;
+    display: inline-block; padding: 8px 18px; border-radius: 14px;
+    font-size: 20px; font-weight: 800;
+    position: absolute; top: -22px; left: 32px;
+  }
+  .scan-line { display: flex; align-items: center; gap: 16px; padding: 14px 0; }
+  .scan-line .em { font-size: 32px; }
+  .scan-line .nm { font-size: 26px; font-weight: 700; flex: 1; }
+  .scan-line .qt { font-size: 22px; color: #64748B; font-weight: 600; }
+
+  /* === SLIDE 4: Suggestions === */
+  .sug-strip {
+    margin: 320px 0 0 0;
+    padding: 0 50px;
+    overflow: visible;
+  }
+  .sug-row { display: flex; gap: 18px; }
+  .sug {
+    background: #fff; border-radius: 22px; padding: 24px 22px;
+    flex: 0 0 220px; min-width: 220px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1);
+    border: 2px solid #ECEAE0;
+  }
+  .sug.over { border-color: #B98C32; background: #FFF8E1; }
+  .sug .em { font-size: 56px; }
+  .sug .nm { font-size: 26px; font-weight: 800; margin-top: 12px; }
+  .sug .why { font-size: 18px; color: #64748B; font-weight: 600; margin-top: 6px; }
+  .sug .pill {
+    margin-top: 14px; display: inline-block;
+    background: #1E3A8A; color: white;
+    padding: 6px 14px; border-radius: 12px;
+    font-size: 18px; font-weight: 700;
+  }
+  .sug.over .pill { background: #B98C32; }
+
+  /* === SLIDE 5: Wrapped === */
+  .wrap-card {
+    margin: 220px 60px 24px 60px;
+    background: linear-gradient(135deg, #1E3A8A 0%, #3B5BBA 100%);
+    border-radius: 30px; padding: 40px;
+    color: white;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .wrap-eyebrow { font-size: 22px; font-weight: 800; opacity: 0.7; letter-spacing: 2px; text-transform: uppercase; }
+  .wrap-h { font-size: 70px; font-weight: 900; margin-top: 8px; letter-spacing: -2px; }
+  .wrap-amt { font-size: 110px; font-weight: 900; margin-top: 16px; letter-spacing: -3px; }
+  .wrap-sub { font-size: 26px; opacity: 0.78; margin-top: 6px; }
+
+  .wrap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 0 60px; margin-top: 6px; }
+  .wrap-tile {
+    background: linear-gradient(135deg, #B98C32 0%, #D4A84A 100%);
+    border-radius: 26px; padding: 28px 28px;
+    color: white;
+  }
+  .wrap-tile.alt { background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%); }
+  .wrap-tile .lbl { font-size: 18px; opacity: 0.7; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; }
+  .wrap-tile .num { font-size: 60px; font-weight: 900; margin-top: 8px; letter-spacing: -1px; }
+  .wrap-tile .tail { font-size: 22px; opacity: 0.75; margin-top: 4px; font-weight: 600; }
+  .wrap-tile .em { font-size: 50px; text-align: right; margin-top: 6px; }
+
+  /* === Header avatar gradients === */
+  .av-blue { background: linear-gradient(135deg, #1E3A8A, #3B5BBA); }
+  .av-gold { background: linear-gradient(135deg, #B98C32, #D4A84A); }
+  .av-rose { background: linear-gradient(135deg, #DA4453, #89216B); }
+  .av-teal { background: linear-gradient(135deg, #0F766E, #2DD4BF); }
+
+  /* Tab bar */
+  .tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 130px; padding: 18px 50px 36px;
+    display: flex; justify-content: space-around; align-items: center;
+    background: rgba(255,255,255,0.92);
+    border-top: 1px solid #E2E8F0;
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0.4; }
+  .tab.active { opacity: 1; }
+  .tab .ic { width: 36px; height: 36px; background: #64748B; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z'/%3E%3C/svg%3E"); mask-size: contain; }
+  .tab.active .ic { background: #1E3A8A; }
+  .tab .lb { font-size: 18px; font-weight: 700; color: #64748B; }
+  .tab.active .lb { color: #1E3A8A; }
+
+  /* Logo wordmark */
+  .logo-wm { position: absolute; top: 70px; left: 90px; font-size: 40px; font-weight: 900; letter-spacing: -1px; opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<!-- ============== SLIDE 1: HERO ============== -->
+<div class="frame bg-sapphire" data-id="1" data-active>
+  <div class="logo-wm">✦ Listorix</div>
+  <div class="headline">
+    <div class="eyebrow">Family shopping, reimagined</div>
+    <div class="h1">Shop together.<br/><span class="accent">Effortlessly.</span></div>
+    <div class="sub">Real-time lists for your whole family.<br/>One tap, everyone's in sync.</div>
+  </div>
+  <div class="phone">
+    <div class="status">
+      <span>9:41</span>
+      <div class="pill"></div>
+      <div class="status-icons">▣ ▤ ▮</div>
+    </div>
+    <div class="app-header">
+      <div class="app-title">Family List 👨‍👩‍👧</div>
+      <div class="app-sub">7 items · 3 checked · ₹1,240</div>
+      <div class="avatar-row">
+        <div class="av av-blue">A</div>
+        <div class="av av-gold">P</div>
+        <div class="av av-rose">M</div>
+        <div class="av av-teal">+2</div>
+      </div>
+    </div>
+    <div class="hero-list">
+      <div class="item"><div class="emoji">🥛</div><div class="name">Amul Milk 1L × 2</div><div class="meta">₹130</div><div class="check"></div></div>
+      <div class="item"><div class="emoji">🍞</div><div class="name checked">Whole Wheat Bread</div><div class="meta">₹45</div><div class="check done"></div></div>
+      <div class="item"><div class="emoji">🍅</div><div class="name">Tomatoes 1kg</div><div class="meta">₹40</div><div class="check"></div></div>
+      <div class="item"><div class="emoji">🧴</div><div class="name checked">Dish Soap</div><div class="meta">₹98</div><div class="check done"></div></div>
+      <div class="item"><div class="emoji">🥚</div><div class="name">Eggs (12 pk)</div><div class="meta">₹84</div><div class="check"></div></div>
+    </div>
+    <div class="tabbar">
+      <div class="tab active"><div class="ic"></div><div class="lb">List</div></div>
+      <div class="tab"><div class="ic"></div><div class="lb">History</div></div>
+      <div class="tab"><div class="ic"></div><div class="lb">Insights</div></div>
+      <div class="tab"><div class="ic"></div><div class="lb">Profile</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== SLIDE 2: VOICE ============== -->
+<div class="frame bg-deep" data-id="2">
+  <div class="logo-wm">✦ Listorix</div>
+  <div class="headline">
+    <div class="eyebrow">Just speak</div>
+    <div class="h1">Add by <span class="accent">voice.</span><br/>Even in Hinglish.</div>
+    <div class="sub">"Do kg pyaaz aur ek litre doodh"<br/>becomes 2 perfect items.</div>
+  </div>
+  <div class="mic-card">
+    <div class="mic-pulse"><div class="mic-icon"></div></div>
+    <div class="transcript-bubble">"Two kg onion aur ek litre doodh, six eggs and bread"</div>
+    <div class="chips">
+      <div class="chip">🧅 Onion 2 kg</div>
+      <div class="chip">🥛 Milk 1 L</div>
+      <div class="chip gold">🥚 Eggs ×6</div>
+      <div class="chip">🍞 Bread</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== SLIDE 3: SCAN ============== -->
+<div class="frame bg-gold" data-id="3">
+  <div class="logo-wm">✦ Listorix</div>
+  <div class="headline">
+    <div class="eyebrow">Snap & save</div>
+    <div class="h1">Scan any<br/><span class="accent">receipt.</span></div>
+    <div class="sub">Zepto, Blinkit, Swiggy or paper bills —<br/>we read them all.</div>
+  </div>
+  <div class="scan-container">
+    <div class="receipt">
+      <div class="receipt-header">
+        <div class="receipt-logo">⚡ Zepto</div>
+        <div class="receipt-meta">Order #ZP847291  •  10 min delivery</div>
+      </div>
+      <div class="receipt-line"><span>🍅 Tomato 1kg</span><span>₹40</span></div>
+      <div class="receipt-line"><span>🥛 Amul Milk 1L</span><span>₹65</span></div>
+      <div class="receipt-line"><span>🥖 Brown Bread</span><span>₹45</span></div>
+      <div class="receipt-line"><span>🍌 Banana 6pcs</span><span>₹30</span></div>
+      <div class="receipt-line tot"><span>Total</span><span>₹180</span></div>
+    </div>
+    <div class="scan-output">
+      <div class="label">✓ EXTRACTED</div>
+      <div class="scan-line"><div class="em">🍅</div><div class="nm">Tomato</div><div class="qt">1 kg · ₹40</div></div>
+      <div class="scan-line"><div class="em">🥛</div><div class="nm">Amul Milk</div><div class="qt">1 L · ₹65</div></div>
+      <div class="scan-line"><div class="em">🥖</div><div class="nm">Brown Bread</div><div class="qt">₹45</div></div>
+      <div class="scan-line"><div class="em">🍌</div><div class="nm">Banana</div><div class="qt">6 pcs · ₹30</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== SLIDE 4: SUGGESTIONS ============== -->
+<div class="frame bg-cream" data-id="4">
+  <div class="logo-wm" style="color: #1E3A8A;">✦ Listorix</div>
+  <div class="headline">
+    <div class="eyebrow" style="color: #64748B;">Predictive shopping</div>
+    <div class="h1 dark" style="color:#0F172A;">Knows what you<br/><span class="accent">need next.</span></div>
+    <div class="sub" style="color: #64748B;">Smart reminders learned from your<br/>shopping habits over time.</div>
+  </div>
+  <div class="sug-strip">
+    <div class="sug-row">
+      <div class="sug over">
+        <div class="em">🥛</div>
+        <div class="nm">Milk</div>
+        <div class="why">You usually buy every 4 days</div>
+        <div class="pill">2 days overdue</div>
+      </div>
+      <div class="sug over">
+        <div class="em">🍞</div>
+        <div class="nm">Bread</div>
+        <div class="why">You usually buy every 5 days</div>
+        <div class="pill">Due today</div>
+      </div>
+      <div class="sug">
+        <div class="em">🥚</div>
+        <div class="nm">Eggs</div>
+        <div class="why">You usually buy every 7 days</div>
+        <div class="pill">Soon</div>
+      </div>
+      <div class="sug">
+        <div class="em">🧻</div>
+        <div class="nm">Toilet Paper</div>
+        <div class="why">You usually buy monthly</div>
+        <div class="pill">Soon</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== SLIDE 5: WRAPPED ============== -->
+<div class="frame bg-sapphire" data-id="5">
+  <div class="logo-wm">✦ Listorix</div>
+  <div class="headline">
+    <div class="eyebrow">Your monthly story</div>
+    <div class="h1">Track your<br/><span class="accent">progress.</span></div>
+    <div class="sub">Streaks, savings, and smart insights —<br/>every month, beautifully wrapped.</div>
+  </div>
+  <div class="wrap-card">
+    <div class="wrap-eyebrow">April Wrap</div>
+    <div class="wrap-h">You spent</div>
+    <div class="wrap-amt">₹14,820</div>
+    <div class="wrap-sub">across 18 active shopping days · 🔥 12-day streak</div>
+  </div>
+  <div class="wrap-grid">
+    <div class="wrap-tile">
+      <div class="lbl">Items added</div>
+      <div class="num">142</div>
+      <div class="em">🛒</div>
+    </div>
+    <div class="wrap-tile alt">
+      <div class="lbl">Top category</div>
+      <div class="num" style="font-size: 38px;">Vegetables</div>
+      <div class="tail">38 items · 27%</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
