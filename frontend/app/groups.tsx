@@ -13,6 +13,7 @@ import { useAuth } from '../src/store/auth';
 import {
   Group, GroupMember, listMyGroups, createGroup, createInvite, listMembers, leaveGroup, deleteGroup,
 } from '../src/api/groups';
+import { crossAlert, crossConfirm } from '../src/utils/cross-alert';
 
 export default function GroupsScreen() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function GroupsScreen() {
       const list = await listMyGroups();
       setGroups(list);
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to load groups');
+      console.error('[groups] load failed:', e); crossAlert('Could not load groups', e?.message ?? 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -61,7 +62,9 @@ export default function GroupsScreen() {
       setCurrentGroupId(g.id);
       await load();
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to create group');
+      // eslint-disable-next-line no-console
+      console.error('[groups] create failed:', e);
+      crossAlert('Could not create group', e?.message || e?.code || 'Unknown error. Check console.');
     } finally {
       setBusyAction(null);
     }

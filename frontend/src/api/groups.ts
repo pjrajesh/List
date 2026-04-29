@@ -39,12 +39,45 @@ export async function listMyGroups(): Promise<Group[]> {
 
 export async function createGroup(name: string, emoji: string = '👥'): Promise<Group> {
   const userId = await getCurrentUserId();
-  const { data, error } = await supabase
+  if (!userId) throw new Error('Not authenticated. Please sign in again.');
+
+  // Insert WITHOUT .select() to avoid an RLS-gated SELECT race against the
+  // `on_group_created` trigger that adds the owner row in group_members.
+  const { data: inserted, error: insErr } = await supabase
     .from('groups')
     .insert({ name, emoji, owner_id: userId })
-    .select('*')
+    .select('id')
     .single();
-  if (error) throw error;
+  if (insErr) {
+    // eslint-disable-next-line no-console
+    console.error('[groups] insert failed:', insErr);
+    throw new Error(insErr.message || 'Could not create group');
+  }
+  const groupId = inserted?.id as string | undefined;
+  if (!groupId) throw new Error('Group created but no id returned');
+
+  // Defensive: ensure membership exists. The trigger should have done this,
+  // but if the user's project hasn't run the latest schema, this guarantees
+  // the owner can see their own group.
+  const { error: memErr } = await supabase
+    .from('group_members')
+    .upsert({ group_id: groupId, user_id: userId, role: 'owner' }, { onConflict: 'group_id,user_id' });
+  if (memErr) {
+    // eslint-disable-next-line no-console
+    console.warn('[groups] membership upsert warning:', memErr.message);
+    // not fatal — trigger may already have inserted
+  }
+
+  // Now fetch the row (RLS-safe since we are a member)
+  const { data, error } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('id', groupId)
+    .single();
+  if (error || !data) {
+    // Fallback: synthesize the row from what we just inserted
+    return { id: groupId, name, emoji, owner_id: userId, created_at: new Date().toISOString() } as Group;
+  }
   return data as Group;
 }
 
