@@ -4,7 +4,7 @@ import {
   StatusBar, Modal, TextInput, KeyboardAvoidingView,
   Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -32,6 +32,10 @@ export default function HomeScreen() {
   const { colors, isDark } = useTheme();
   const { currency, budget, currentGroupId } = useSettings();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  // Tab bar height ≈ paddingTop(8) + container(74) + paddingBottom(insets.bottom + 8) ≈ 90 + insets.bottom.
+  // Place FAB 12 px above the tab bar so it sits cleanly without overlapping.
+  const fabBottom = 90 + insets.bottom + 12;
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [items, setItems] = useState<RemoteItem[]>([]);
@@ -422,7 +426,7 @@ export default function HomeScreen() {
         onRefresh={load}
       />
 
-      <TouchableOpacity testID="add-item-fab" style={styles.fab} onPress={() => setShowSheet(true)} activeOpacity={0.85}>
+      <TouchableOpacity testID="add-item-fab" style={[styles.fab, { bottom: fabBottom }]} onPress={() => setShowSheet(true)} activeOpacity={0.85}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
@@ -567,7 +571,7 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   deleteActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
   editAction: { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', width: 80, gap: 4 },
   editActionText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-  fab: { position: 'absolute', bottom: 100, right: 20, width: 58, height: 58, borderRadius: 29, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg },
+  fab: { position: 'absolute', right: 20, width: 58, height: 58, borderRadius: 29, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg },
   modalOverlay: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: 'center', alignItems: 'center' },
   modal: { backgroundColor: colors.surface, borderRadius: 28, padding: 24, width: '90%', ...SHADOWS.lg },
   modalLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '500', marginBottom: 4 },

@@ -162,6 +162,86 @@ export async function getSuggestions(
 
   candidates.sort((a, b) => b.score - a.score);
 
+  // Always pad with defaults until we hit MAX_SUGGESTIONS so the carousel feels
+  // full even for users with limited history.
+  if (candidates.length < MAX_SUGGESTIONS) {
+    for (const d of DEFAULTS) {
+      if (exclude.has(normalizeName(d.name))) continue;
+      if (candidates.find(c => normalizeName(c.name) === normalizeName(d.name))) continue;
+      candidates.push({ ...d, score: 0 });
+      if (candidates.length >= MAX_SUGGESTIONS) break;
+    }
+  }
+
+  return candidates.slice(0, MAX_SUGGESTIONS).map(({ score, ...rest }) => rest);
+}
+ates: [] });
+    }
+    map.get(key)!.dates.push(new Date(it.created_at).getTime());
+  }
+
+  const now = Date.now();
+  const DAY = 86400_000;
+  const candidates: (Suggestion & { score: number })[] = [];
+
+  for (const [key, v] of map) {
+    if (exclude.has(key)) continue;
+    if (v.dates.length < 2) continue;
+
+    v.dates.sort((a, b) => a - b);
+    const last = v.dates[v.dates.length - 1];
+    const daysSinceLast = (now - last) / DAY;
+
+    let totalGap = 0;
+    for (let i = 1; i < v.dates.length; i++) totalGap += (v.dates[i] - v.dates[i - 1]) / DAY;
+    const avgIntervalDays = Math.max(totalGap / (v.dates.length - 1), 1);
+
+    const overdueRatio = daysSinceLast / avgIntervalDays;
+    const isOverdue = overdueRatio >= 0.85; // due or overdue
+    const score = v.dates.length * Math.min(overdueRatio, 2);
+
+    const partial = {
+      name: v.name,
+      category: v.category,
+      emoji: v.emoji,
+      color: v.color,
+      occurrenceCount: v.dates.length,
+      avgIntervalDays,
+      daysSinceLast,
+      isOverdue,
+      isDefault: false,
+    };
+    candidates.push({
+      ...partial,
+      reason: reasonFor(partial),
+      score,
+    });
+  }
+
+  // Add 1-time-bought items as weaker candidates (still useful)
+  for (const [key, v] of map) {
+    if (exclude.has(key)) continue;
+    if (v.dates.length !== 1) continue;
+    const daysSinceLast = (now - v.dates[0]) / DAY;
+    if (daysSinceLast < 7) continue; // too recent — they probably don't need it again yet
+
+    candidates.push({
+      name: v.name,
+      category: v.category,
+      emoji: v.emoji,
+      color: v.color,
+      occurrenceCount: 1,
+      avgIntervalDays: 0,
+      daysSinceLast,
+      isOverdue: false,
+      isDefault: false,
+      reason: 'You bought this before',
+      score: 0.5, // weak
+    });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+
   // Pad with defaults for new users
   if (candidates.length < 3) {
     for (const d of DEFAULTS) {
