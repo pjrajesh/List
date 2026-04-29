@@ -38,11 +38,15 @@ export async function listMyGroups(): Promise<Group[]> {
 }
 
 export async function createGroup(name: string, emoji: string = '👥'): Promise<Group> {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error('Not authenticated. Please sign in again.');
+  // Force-refresh session so the JWT we send is fresh and auth.uid() on the
+  // server matches the user_id we're putting into owner_id.
+  const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+  if (sessErr || !sessionData.session?.user?.id) {
+    throw new Error('Not authenticated. Please sign in again.');
+  }
+  const userId = sessionData.session.user.id;
 
-  // Insert WITHOUT .select() to avoid an RLS-gated SELECT race against the
-  // `on_group_created` trigger that adds the owner row in group_members.
+  // Insert. We rely on RLS:  with check (auth.uid() = owner_id)
   const { data: inserted, error: insErr } = await supabase
     .from('groups')
     .insert({ name, emoji, owner_id: userId })
@@ -51,6 +55,15 @@ export async function createGroup(name: string, emoji: string = '👥'): Promise
   if (insErr) {
     // eslint-disable-next-line no-console
     console.error('[groups] insert failed:', insErr);
+    const msg = (insErr.message || '').toLowerCase();
+    if (msg.includes('row-level security') || msg.includes('violates row-level')) {
+      throw new Error(
+        'Database security rules are out of date. Open Supabase → SQL Editor and run the file `supabase/FIX_GROUPS_RLS.sql`, then try again.'
+      );
+    }
+    if (msg.includes('jwt') || msg.includes('not authenticated')) {
+      throw new Error('Your session expired. Please sign out and sign in again.');
+    }
     throw new Error(insErr.message || 'Could not create group');
   }
   const groupId = inserted?.id as string | undefined;
