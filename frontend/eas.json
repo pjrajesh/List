@@ -61,6 +61,7 @@
       },
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://api.listorix.com",
+        "EXPO_PUBLIC_USE_EDGE_FUNCTIONS": "true",
         "EXPO_PUBLIC_SUPABASE_URL": "https://vdvrkzeproulsrbguhgt.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_lZ0cJid7KN-z7yzhikxKPQ_LRfSwTlA",
         "EXPO_PUBLIC_INVITE_BASE_URL": "https://listorix.com/join",

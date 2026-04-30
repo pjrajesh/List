@@ -30,6 +30,7 @@ export interface NotificationPreferences {
 }
 
 const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_URL as string | undefined)?.replace(/\/$/, '') || '';
+const USE_EDGE = String(process.env.EXPO_PUBLIC_USE_EDGE_FUNCTIONS ?? '').toLowerCase() === 'true';
 
 /**
  * Fire-and-forget push notification.
@@ -37,6 +38,11 @@ const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_URL as string | undefined)?
  */
 export async function sendPushNotification(payload: SendNotificationPayload): Promise<void> {
   try {
+    if (USE_EDGE) {
+      const { error } = await supabase.functions.invoke('notifications-send', { body: payload });
+      if (error) console.warn('[notifications edge] failed:', error);
+      return;
+    }
     if (!BACKEND_URL) return;
     const { data: sess } = await supabase.auth.getSession();
     const jwt = sess.session?.access_token;
