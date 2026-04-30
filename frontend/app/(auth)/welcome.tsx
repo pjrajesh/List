@@ -15,6 +15,7 @@ import Animated, {
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme } from '../../src/store/settings';
 import SocialAuthButtons from '../../src/components/SocialAuthButtons';
+import Logo from '../../src/components/Logo';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -130,9 +131,7 @@ export default function Welcome() {
       <SafeAreaView style={styles.topBar} edges={['top']} pointerEvents="box-none">
         <View style={styles.topBarInner}>
           {/* logo mark */}
-          <View style={styles.logoMark}>
-            <Text style={styles.logoMarkText}>L</Text>
-          </View>
+          <Logo size={36} tone="glass" />
           {page < SLIDES.length && (
             <TouchableOpacity testID="welcome-skip-btn" onPress={skipToAuth} hitSlop={10}>
               <Text style={styles.skipText}>Skip</Text>
@@ -299,19 +298,13 @@ function AuthSlide({ router, colors, active }: { router: ReturnType<typeof useRo
         <View style={styles.authHero}>
           {active && (
             <Animated.View entering={FadeIn.duration(520)}>
-              <LinearGradient
-                colors={['#1E3A8A', '#3B5BBA', '#B98C32']}
-                style={styles.authLogoWrap}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.authLogoEmoji}>🛒</Text>
-              </LinearGradient>
+              <Logo size={104} tone="brand" />
             </Animated.View>
           )}
 
           {active && (
             <Animated.View entering={FadeInDown.duration(520).delay(120)}>
-              <Text style={styles.authBrand}>Listorix</Text>
+              <Text style={styles.authBrand}>LISTORIX</Text>
               <Text style={styles.authTagline}>Shop smarter. Together.</Text>
             </Animated.View>
           )}
@@ -456,8 +449,8 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   },
   authLogoEmoji: { fontSize: 56 },
   authBrand: {
-    fontSize: 42, fontWeight: '900', letterSpacing: -1.5,
-    color: colors.textPrimary, marginTop: 24, textAlign: 'center',
+    fontSize: 36, fontWeight: '900', letterSpacing: 4,
+    color: colors.textPrimary, marginTop: 20, textAlign: 'center',
   },
   authTagline: {
     fontSize: 15, color: colors.textSecondary, fontWeight: '500',
