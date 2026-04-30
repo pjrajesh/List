@@ -30,7 +30,7 @@ export default function SocialAuthButtons({ onBusyChange }: Props) {
     <View style={styles.wrap}>
       <View style={styles.divider}>
         <View style={styles.line} />
-        <Text style={styles.dividerText}>or continue with</Text>
+        <Text style={styles.dividerText}>Continue with</Text>
         <View style={styles.line} />
       </View>
 

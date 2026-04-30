@@ -210,7 +210,7 @@ export default function ProfileScreen() {
             colors={colors}
             iconName="document-text-outline"
             label="Terms of Service"
-            onPress={() => openLink(TERMS_URL, 'Terms of Service')}
+            onPress={() => router.push('/terms' as any)}
             testID="setting-terms"
             right={<Ionicons name="open-outline" size={16} color={colors.textSecondary} />}
             border
@@ -219,7 +219,7 @@ export default function ProfileScreen() {
             colors={colors}
             iconName="shield-checkmark-outline"
             label="Privacy Policy"
-            onPress={() => openLink(PRIVACY_URL, 'Privacy Policy')}
+            onPress={() => router.push('/privacy' as any)}
             testID="setting-privacy"
             right={<Ionicons name="open-outline" size={16} color={colors.textSecondary} />}
           />

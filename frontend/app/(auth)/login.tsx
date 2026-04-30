@@ -102,6 +102,22 @@ export default function LogIn() {
           >
             <Text style={styles.linkText}>New here? <Text style={styles.linkStrong}>Create account</Text></Text>
           </TouchableOpacity>
+
+          {/* Legal footer */}
+          <Text style={styles.legal}>
+            By continuing, you agree to our{' '}
+            <Text
+              testID="login-terms-link"
+              style={styles.legalLink}
+              onPress={() => router.push('/terms' as any)}
+            >Terms</Text>
+            {' '}and{' '}
+            <Text
+              testID="login-privacy-link"
+              style={styles.legalLink}
+              onPress={() => router.push('/privacy' as any)}
+            >Privacy Policy</Text>.
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -129,4 +145,9 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   link: { alignItems: 'center', marginTop: 16, padding: 8 },
   linkText: { fontSize: 14, color: colors.textSecondary },
   linkStrong: { color: colors.primary, fontWeight: '700' },
+  legal: {
+    fontSize: 11.5, color: colors.textTertiary, textAlign: 'center',
+    marginTop: 16, lineHeight: 17, paddingHorizontal: 16,
+  },
+  legalLink: { fontWeight: '700', color: colors.textSecondary, textDecorationLine: 'underline' },
 });

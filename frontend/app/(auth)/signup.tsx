@@ -127,6 +127,22 @@ export default function SignUp() {
           >
             <Text style={styles.linkText}>Already have an account? <Text style={styles.linkStrong}>Log in</Text></Text>
           </TouchableOpacity>
+
+          {/* Legal footer */}
+          <Text style={styles.legal}>
+            By creating an account, you agree to our{' '}
+            <Text
+              testID="signup-terms-link"
+              style={styles.legalLink}
+              onPress={() => router.push('/terms' as any)}
+            >Terms</Text>
+            {' '}and{' '}
+            <Text
+              testID="signup-privacy-link"
+              style={styles.legalLink}
+              onPress={() => router.push('/privacy' as any)}
+            >Privacy Policy</Text>.
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -154,4 +170,9 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   link: { alignItems: 'center', marginTop: 16, padding: 8 },
   linkText: { fontSize: 14, color: colors.textSecondary },
   linkStrong: { color: colors.primary, fontWeight: '700' },
+  legal: {
+    fontSize: 11.5, color: colors.textTertiary, textAlign: 'center',
+    marginTop: 16, lineHeight: 17, paddingHorizontal: 16,
+  },
+  legalLink: { fontWeight: '700', color: colors.textSecondary, textDecorationLine: 'underline' },
 });
