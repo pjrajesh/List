@@ -18,6 +18,7 @@ import {
   RemoteItem, listItems, addItemsBulk, updateItem, deleteItem, deleteItemsByIds,
   getAllScopeCounts, ScopeCount,
 } from '../../src/api/items';
+import Logo from '../../src/components/Logo';
 import { listMyGroups, Group } from '../../src/api/groups';
 import { getSuggestions, Suggestion } from '../../src/api/suggestions';
 import { sendPushNotification, fetchMyPrefs } from '../../src/api/notifications';
@@ -435,7 +436,7 @@ export default function HomeScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={styles.header}>
-        <Text style={styles.brandText}>Listorix</Text>
+        <Logo variant="full" layout="row" size={30} />
       </View>
 
       <FlatList
