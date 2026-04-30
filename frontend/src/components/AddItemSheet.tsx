@@ -464,7 +464,7 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
                 {aiBusy === 'scan' ? (
                   <ActivityIndicator color={colors.primary} />
                 ) : (
-                  <Ionicons name="scan-outline" size={22} color={colors.primary} />
+                  <Ionicons name="camera-outline" size={22} color={colors.primary} />
                 )}
               </View>
             </TouchableOpacity>
@@ -488,7 +488,7 @@ export default function AddItemSheet({ visible, onClose, onAddBulk, onAdd, listT
                 <Ionicons name="mic-outline" size={11} color={colors.textSecondary} />
                 <Text style={styles.usageText}>{usage.voice_remaining}/{usage.voice_limit}</Text>
                 <View style={styles.usageDot} />
-                <Ionicons name="scan-outline" size={11} color={colors.textSecondary} />
+                <Ionicons name="camera-outline" size={11} color={colors.textSecondary} />
                 <Text style={styles.usageText}>{usage.scan_remaining}/{usage.scan_limit}</Text>
               </View>
             )}
