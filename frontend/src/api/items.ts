@@ -96,3 +96,42 @@ export async function deleteItemsByIds(ids: string[]): Promise<void> {
   const { error } = await supabase.from('items').delete().in('id', ids);
   if (error) throw error;
 }
+
+export interface ScopeCount {
+  scopeId: string | null; // null = personal, otherwise group_id
+  name: string;
+  emoji: string;
+  count: number;
+}
+
+/**
+ * Returns item counts for ALL of the user's scopes (Personal + every group).
+ * Used by the empty-state to hint "Your items might be in <other list>".
+ * Cheap: a single query selecting (group_id, owner_id) without payload.
+ */
+export async function getAllScopeCounts(): Promise<ScopeCount[]> {
+  const userId = await getCurrentUserId();
+  // Pull just the discriminator fields we need
+  const [{ data: itemRows, error: iErr }, { data: groupRows, error: gErr }] = await Promise.all([
+    supabase.from('items').select('group_id, owner_id, checked'),
+    supabase.from('groups').select('id, name, emoji'),
+  ]);
+  if (iErr) throw iErr;
+  if (gErr) throw gErr;
+
+  // Count personal (owner_id matches user) + per group_id
+  let personalCount = 0;
+  const groupCounts = new Map<string, number>();
+  (itemRows ?? []).forEach((r: any) => {
+    if (r.owner_id === userId) personalCount += 1;
+    if (r.group_id) groupCounts.set(r.group_id, (groupCounts.get(r.group_id) ?? 0) + 1);
+  });
+
+  const result: ScopeCount[] = [
+    { scopeId: null, name: 'Personal', emoji: '🔒', count: personalCount },
+  ];
+  (groupRows ?? []).forEach((g: any) => {
+    result.push({ scopeId: g.id, name: g.name, emoji: g.emoji ?? '👥', count: groupCounts.get(g.id) ?? 0 });
+  });
+  return result;
+}

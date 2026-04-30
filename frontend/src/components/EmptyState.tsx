@@ -18,13 +18,32 @@ const QUICK_ITEMS = [
   { name: 'Bananas', emoji: '🍌', category: 'Fruits', color: '#FCE7F3' },
 ];
 
+interface OtherListHint {
+  scopeId: string | null;
+  name: string;
+  emoji: string;
+  count: number;
+}
+
 interface Props {
   listType: 'personal' | 'family';
+  /** The actual scope name being displayed, e.g. "Personal" or "Family Trip". */
+  scopeLabel?: string;
+  /** Emoji shown next to the scope label */
+  scopeEmoji?: string;
+  /** Other lists the user has access to that DO contain items. Used to gently
+   *  redirect a confused user. */
+  otherListsWithItems?: OtherListHint[];
+  /** Tap on hint pill switches to that list. */
+  onSwitchTo?: (scopeId: string | null) => void;
   onAdd?: (item: ShoppingItem) => void;
   onOpenSheet: () => void;
 }
 
-export default function EmptyState({ listType, onAdd, onOpenSheet }: Props) {
+export default function EmptyState({
+  listType, scopeLabel, scopeEmoji, otherListsWithItems = [],
+  onSwitchTo, onAdd, onOpenSheet,
+}: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const floatY = useSharedValue(0);
@@ -81,14 +100,48 @@ export default function EmptyState({ listType, onAdd, onOpenSheet }: Props) {
         <View style={[styles.badge, styles.badgeBR]}><Text style={styles.badgeEmoji}>🍎</Text></View>
       </View>
 
+      <Text style={styles.scopeChip}>
+        {scopeEmoji ?? (listType === 'personal' ? '🔒' : '👥')}  {scopeLabel ?? (listType === 'personal' ? 'Personal' : 'Family list')}
+      </Text>
       <Text style={styles.title}>
-        {listType === 'personal' ? 'Ready to shop? 🛍️' : 'Family list is empty!'}
+        {listType === 'personal' ? `Your ${scopeLabel ?? 'Personal'} list is empty` : `${scopeLabel ?? 'This list'} is empty`}
       </Text>
       <Text style={styles.subtitle}>
         {listType === 'personal'
           ? 'Add groceries by typing, speaking,\nor scanning your receipt'
           : 'Add items to plan your next\nfamily shopping trip together'}
       </Text>
+
+      {/* Hint: other lists that DO contain items */}
+      {otherListsWithItems.length > 0 && (
+        <View style={styles.hintCard} testID="empty-other-lists-hint">
+          <View style={styles.hintHeader}>
+            <Ionicons name="bulb-outline" size={16} color={colors.primary} />
+            <Text style={styles.hintTitle}>Looking for your items?</Text>
+          </View>
+          <Text style={styles.hintBody}>
+            They might be on a different list. Tap one to switch:
+          </Text>
+          <View style={styles.hintBtns}>
+            {otherListsWithItems.slice(0, 3).map((o) => (
+              <TouchableOpacity
+                key={o.scopeId ?? 'personal'}
+                testID={`empty-switch-${o.scopeId ?? 'personal'}`}
+                style={styles.hintBtn}
+                onPress={() => onSwitchTo?.(o.scopeId)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.hintBtnEmoji}>{o.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.hintBtnName} numberOfLines={1}>{o.name}</Text>
+                  <Text style={styles.hintBtnCount}>{o.count} item{o.count !== 1 ? 's' : ''}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
 
       <TouchableOpacity
         testID="empty-add-item-btn"
@@ -144,8 +197,33 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   badgeBL: { bottom: 20, left: 16 },
   badgeBR: { bottom: 20, right: 16 },
   badgeEmoji: { fontSize: 20 },
-  title: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 28, fontWeight: '400' },
+  scopeChip: {
+    fontSize: 12, fontWeight: '800', color: colors.primary,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99,
+    marginBottom: 12, overflow: 'hidden', letterSpacing: 0.3,
+  },
+  title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center', marginBottom: 8 },
+  subtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 20, fontWeight: '400' },
+  hintCard: {
+    width: '92%',
+    backgroundColor: colors.surface,
+    borderRadius: 18, padding: 14, marginBottom: 22,
+    borderWidth: 1, borderColor: colors.primary + '22',
+    ...SHADOWS.sm,
+  },
+  hintHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  hintTitle: { fontSize: 13, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.2 },
+  hintBody: { fontSize: 12, color: colors.textSecondary, marginBottom: 10, fontWeight: '500' },
+  hintBtns: { gap: 8 },
+  hintBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14,
+  },
+  hintBtnEmoji: { fontSize: 20 },
+  hintBtnName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+  hintBtnCount: { fontSize: 11, fontWeight: '600', color: colors.primary, marginTop: 1 },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary,
     paddingHorizontal: 32, paddingVertical: 16, borderRadius: 20, gap: 8, marginBottom: 32,

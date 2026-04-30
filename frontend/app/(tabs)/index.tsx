@@ -16,6 +16,7 @@ import { formatCurrency } from '../../src/utils/currency';
 import { CATEGORIES } from '../../src/data/mockData';
 import {
   RemoteItem, listItems, addItemsBulk, updateItem, deleteItem, deleteItemsByIds,
+  getAllScopeCounts, ScopeCount,
 } from '../../src/api/items';
 import { listMyGroups, Group } from '../../src/api/groups';
 import { getSuggestions, Suggestion } from '../../src/api/suggestions';
@@ -42,6 +43,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<Group | null>(null);
   const [groupCount, setGroupCount] = useState(0);
+  const [scopeCounts, setScopeCounts] = useState<ScopeCount[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(true);
 
@@ -65,12 +67,14 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, groups] = await Promise.all([
+      const [list, groups, counts] = await Promise.all([
         listItems(scope),
         listMyGroups(),
+        getAllScopeCounts().catch(() => [] as ScopeCount[]),
       ]);
       setItems(list);
       setGroupCount(groups.length);
+      setScopeCounts(counts);
       if (currentGroupId) {
         setGroup(groups.find(g => g.id === currentGroupId) ?? null);
       } else {
@@ -326,9 +330,18 @@ export default function HomeScreen() {
         onPress={() => router.push('/groups' as any)}
         activeOpacity={0.85}
       >
+        <View style={styles.switcherIcon}>
+          <Text style={{ fontSize: 22 }}>{currentGroupId ? (group?.emoji ?? '👥') : '🔒'}</Text>
+        </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.switcherLabel}>CURRENT LIST</Text>
-          <Text style={styles.switcherValue}>{listLabel}</Text>
+          <Text style={styles.switcherLabel}>VIEWING</Text>
+          <Text style={styles.switcherValue} numberOfLines={1}>
+            {currentGroupId ? (group?.name ?? 'Shared list') : 'Personal'}
+          </Text>
+          <Text style={styles.switcherCount}>
+            {allItems.length} item{allItems.length !== 1 ? 's' : ''}
+            {currentGroupId ? ' · shared' : ' · only you'}
+          </Text>
         </View>
         <View style={styles.switcherPill}>
           <Ionicons name="swap-horizontal" size={14} color={colors.primary} />
@@ -382,12 +395,24 @@ export default function HomeScreen() {
     </>
   );
 
-  const ListEmpty = () => (
-    loading ? (
+  const ListEmpty = () => {
+    const otherListsWithItems = scopeCounts
+      .filter(s => {
+        // exclude current scope; only show ones with items
+        const isCurrent = currentGroupId ? s.scopeId === currentGroupId : s.scopeId === null;
+        return !isCurrent && s.count > 0;
+      })
+      .sort((a, b) => b.count - a.count);
+
+    return loading ? (
       <ActivityIndicator color={colors.primary} style={{ marginTop: 32 }} />
     ) : (
       <EmptyState
         listType={currentGroupId ? 'family' : 'personal'}
+        scopeLabel={currentGroupId ? (group?.name ?? 'Shared list') : 'Personal'}
+        scopeEmoji={currentGroupId ? (group?.emoji ?? '👥') : '🔒'}
+        otherListsWithItems={otherListsWithItems}
+        onSwitchTo={(scopeId) => setCurrentGroupId(scopeId)}
         onAdd={async (item) => {
           try {
             await addItemsBulk(scope, [{
@@ -402,8 +427,8 @@ export default function HomeScreen() {
         }}
         onOpenSheet={() => setShowSheet(true)}
       />
-    )
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} testID="home-screen">
@@ -535,9 +560,11 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   metaActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: colors.primaryLight },
   metaActionText: { fontSize: 12, fontWeight: '700', color: colors.primary, letterSpacing: 0.3 },
   listContent: { paddingHorizontal: 16, paddingBottom: 120 },
-  switcher: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 18, padding: 14, marginTop: 8, marginBottom: 12, ...SHADOWS.sm },
+  switcher: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 18, padding: 14, marginTop: 8, marginBottom: 12, borderWidth: 1, borderColor: colors.primary + '20', ...SHADOWS.sm },
+  switcherIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   switcherLabel: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.8, textTransform: 'uppercase' },
-  switcherValue: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
+  switcherValue: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginTop: 2, letterSpacing: -0.3 },
+  switcherCount: { fontSize: 11.5, fontWeight: '600', color: colors.textSecondary, marginTop: 2 },
   switcherPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.primaryLight, borderRadius: 20 },
   switcherPillText: { fontSize: 12, fontWeight: '700', color: colors.primary },
   budgetCard: { backgroundColor: colors.primary, borderRadius: 24, padding: 20, marginBottom: 16, ...SHADOWS.md },
