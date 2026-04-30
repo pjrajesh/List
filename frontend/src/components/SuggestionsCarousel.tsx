@@ -31,7 +31,7 @@ export default function SuggestionsCarousel({ suggestions, loading, onAdd, onRef
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <View style={styles.sparkleWrap}>
-            <Ionicons name="sparkles" size={14} color={colors.secondary} />
+            <Ionicons name="sparkles" size={14} color={colors.primary} />
           </View>
           <Text style={styles.title}>Smart suggestions</Text>
         </View>
@@ -51,41 +51,42 @@ export default function SuggestionsCarousel({ suggestions, loading, onAdd, onRef
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
+          decelerationRate="fast"
         >
           {suggestions.map((s, idx) => {
             const key = s.name.toLowerCase();
             const isBusy = busyKey === key;
             return (
-              <TouchableOpacity
-                key={`${key}-${idx}`}
-                testID={`suggestion-${s.name}`}
-                style={[
-                  styles.card,
-                  s.isOverdue && styles.cardOverdue,
-                ]}
-                onPress={() => handleAdd(s)}
-                disabled={isBusy}
-                activeOpacity={0.85}
-              >
-                {s.isOverdue && (
-                  <View style={styles.overdueDot}>
-                    <Text style={styles.overdueDotText}>!</Text>
-                  </View>
-                )}
-                <Text style={styles.emoji}>{s.emoji ?? '🛒'}</Text>
-                <Text style={styles.name} numberOfLines={1}>{s.name}</Text>
-                <Text style={styles.reason} numberOfLines={1}>{s.reason}</Text>
-                <View style={styles.addPill}>
-                  {isBusy ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="add" size={12} color="#fff" />
-                      <Text style={styles.addPillText}>Add</Text>
-                    </>
+              <View key={`${key}-${idx}`} style={styles.cardWrap} testID={`suggestion-${s.name}`}>
+                {/* Tinted square image area */}
+                <View style={[styles.imageBox, s.isOverdue && styles.imageBoxOverdue]}>
+                  {s.isOverdue && (
+                    <View style={styles.overdueBadge}>
+                      <Text style={styles.overdueBadgeText}>!</Text>
+                    </View>
                   )}
+                  <Text style={styles.emoji}>{s.emoji ?? '🛒'}</Text>
+
+                  {/* Floating + button — bottom-right */}
+                  <TouchableOpacity
+                    onPress={() => handleAdd(s)}
+                    disabled={isBusy}
+                    style={styles.addBtn}
+                    activeOpacity={0.85}
+                    hitSlop={6}
+                  >
+                    {isBusy ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Ionicons name="add" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+
+                {/* Name + subtitle */}
+                <Text style={styles.name} numberOfLines={2}>{s.name}</Text>
+                <Text style={styles.reason} numberOfLines={1}>{s.reason}</Text>
+              </View>
             );
           })}
         </ScrollView>
@@ -94,41 +95,72 @@ export default function SuggestionsCarousel({ suggestions, loading, onAdd, onRef
   );
 }
 
+const CARD_WIDTH = 116;
+const IMAGE_SIZE = 116;
+
 const createStyles = (colors: ColorScheme) => StyleSheet.create({
   container: { marginBottom: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 4 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 12, paddingHorizontal: 4,
+  },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sparkleWrap: {
     width: 24, height: 24, borderRadius: 8,
-    backgroundColor: colors.secondaryLight,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center',
   },
   title: { fontSize: 14, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.2 },
-  scroll: { gap: 10, paddingRight: 8, paddingVertical: 4 },
-  card: {
-    width: 130, padding: 12, borderRadius: 18,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    alignItems: 'flex-start', gap: 6, ...SHADOWS.sm,
+  scroll: { gap: 12, paddingRight: 8, paddingBottom: 4 },
+
+  cardWrap: { width: CARD_WIDTH },
+
+  // Image / emoji tile
+  imageBox: {
+    width: IMAGE_SIZE, height: IMAGE_SIZE,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
-  cardOverdue: { borderColor: colors.secondary, backgroundColor: colors.secondaryLight },
-  overdueDot: {
-    position: 'absolute', top: -6, right: -6,
+  imageBoxOverdue: {
+    backgroundColor: colors.secondaryLight,
+  },
+  emoji: { fontSize: 56 },
+
+  // Floating + button (bottom-right corner)
+  addBtn: {
+    position: 'absolute',
+    right: 8, bottom: 8,
+    width: 36, height: 36,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+
+  overdueBadge: {
+    position: 'absolute', top: 8, left: 8,
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: colors.secondary,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: colors.background,
     zIndex: 2,
+    ...SHADOWS.sm,
   },
-  overdueDotText: { color: '#fff', fontWeight: '900', fontSize: 11 },
-  emoji: { fontSize: 26 },
-  name: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, width: '100%' },
-  reason: { fontSize: 11, color: colors.textSecondary, fontWeight: '500', width: '100%' },
-  addPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
-    backgroundColor: colors.primary, marginTop: 4,
+  overdueBadgeText: { color: '#fff', fontWeight: '900', fontSize: 12 },
+
+  // Text
+  name: {
+    fontSize: 13.5, fontWeight: '700', color: colors.textPrimary,
+    marginTop: 8, lineHeight: 18,
   },
-  addPillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  reason: {
+    fontSize: 11.5, fontWeight: '500', color: colors.textSecondary,
+    marginTop: 2,
+  },
+
   loadingBox: { paddingVertical: 30, alignItems: 'center' },
 });
