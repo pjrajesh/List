@@ -38,60 +38,51 @@ export async function listMyGroups(): Promise<Group[]> {
 }
 
 export async function createGroup(name: string, emoji: string = '👥'): Promise<Group> {
-  // Force-refresh session so the JWT we send is fresh and auth.uid() on the
-  // server matches the user_id we're putting into owner_id.
+  // Force-refresh session so we have a valid JWT to send.
   const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
   if (sessErr || !sessionData.session?.user?.id) {
     throw new Error('Not authenticated. Please sign in again.');
   }
   const userId = sessionData.session.user.id;
 
-  // Insert. We rely on RLS:  with check (auth.uid() = owner_id)
-  const { data: inserted, error: insErr } = await supabase
-    .from('groups')
-    .insert({ name, emoji, owner_id: userId })
-    .select('id')
-    .single();
-  if (insErr) {
+  // Call the SECURITY DEFINER RPC. This bypasses RLS on `groups` and
+  // `group_members` and atomically inserts both rows. See
+  // supabase/CREATE_GROUP_RPC.sql for the function definition.
+  const { data: rpcRow, error: rpcErr } = await supabase.rpc('create_group', {
+    p_name: name,
+    p_emoji: emoji,
+  });
+
+  if (rpcErr) {
     // eslint-disable-next-line no-console
-    console.error('[groups] insert failed:', insErr);
-    const msg = (insErr.message || '').toLowerCase();
-    if (msg.includes('row-level security') || msg.includes('violates row-level')) {
+    console.error('[groups] rpc create_group failed:', rpcErr);
+    const msg = (rpcErr.message || '').toLowerCase();
+    if (msg.includes('could not find the function') || msg.includes('function public.create_group')) {
       throw new Error(
-        'Database security rules are out of date. Open Supabase → SQL Editor and run the file `supabase/FIX_GROUPS_RLS.sql`, then try again.'
+        'Database is missing the `create_group` function. Open Supabase → SQL Editor and run `supabase/CREATE_GROUP_RPC.sql`, then try again.'
       );
     }
-    if (msg.includes('jwt') || msg.includes('not authenticated')) {
+    if (msg.includes('not_authenticated')) {
       throw new Error('Your session expired. Please sign out and sign in again.');
     }
-    throw new Error(insErr.message || 'Could not create group');
-  }
-  const groupId = inserted?.id as string | undefined;
-  if (!groupId) throw new Error('Group created but no id returned');
-
-  // Defensive: ensure membership exists. The trigger should have done this,
-  // but if the user's project hasn't run the latest schema, this guarantees
-  // the owner can see their own group.
-  const { error: memErr } = await supabase
-    .from('group_members')
-    .upsert({ group_id: groupId, user_id: userId, role: 'owner' }, { onConflict: 'group_id,user_id' });
-  if (memErr) {
-    // eslint-disable-next-line no-console
-    console.warn('[groups] membership upsert warning:', memErr.message);
-    // not fatal — trigger may already have inserted
+    if (msg.includes('name_required')) {
+      throw new Error('Group name cannot be empty.');
+    }
+    throw new Error(rpcErr.message || 'Could not create group');
   }
 
-  // Now fetch the row (RLS-safe since we are a member)
-  const { data, error } = await supabase
-    .from('groups')
-    .select('*')
-    .eq('id', groupId)
-    .single();
-  if (error || !data) {
-    // Fallback: synthesize the row from what we just inserted
-    return { id: groupId, name, emoji, owner_id: userId, created_at: new Date().toISOString() } as Group;
-  }
-  return data as Group;
+  // rpc returns the full groups row
+  const row = rpcRow as Group | null;
+  if (row && row.id) return row;
+
+  // Fallback: synthesize from request (shouldn't happen — RPC returns the row)
+  return {
+    id: '',
+    name,
+    emoji,
+    owner_id: userId,
+    created_at: new Date().toISOString(),
+  } as Group;
 }
 
 export async function leaveGroup(groupId: string): Promise<void> {

@@ -15,16 +15,28 @@ export interface Suggestion {
 }
 
 const DEFAULTS: Suggestion[] = [
-  { name: 'Milk',     category: 'Dairy',      emoji: '🥛', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular',  isOverdue: false, isDefault: true },
-  { name: 'Bread',    category: 'Grains',     emoji: '🍞', color: '#FEF3C7', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular',  isOverdue: false, isDefault: true },
-  { name: 'Eggs',     category: 'Dairy',      emoji: '🥚', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular',  isOverdue: false, isDefault: true },
-  { name: 'Tomatoes', category: 'Vegetables', emoji: '🍅', color: '#D1FAE5', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular',  isOverdue: false, isDefault: true },
-  { name: 'Onions',   category: 'Vegetables', emoji: '🧅', color: '#D1FAE5', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular',  isOverdue: false, isDefault: true },
-  { name: 'Bananas',  category: 'Fruits',     emoji: '🍌', color: '#FCE7F3', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular',  isOverdue: false, isDefault: true },
+  { name: 'Milk',        category: 'Dairy',      emoji: '🥛', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Bread',       category: 'Grains',     emoji: '🍞', color: '#FEF3C7', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Eggs',        category: 'Dairy',      emoji: '🥚', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Tomatoes',    category: 'Vegetables', emoji: '🍅', color: '#D1FAE5', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Onions',      category: 'Vegetables', emoji: '🧅', color: '#D1FAE5', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Bananas',     category: 'Fruits',     emoji: '🍌', color: '#FCE7F3', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Potatoes',    category: 'Vegetables', emoji: '🥔', color: '#D1FAE5', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Apples',      category: 'Fruits',     emoji: '🍎', color: '#FCE7F3', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Rice',        category: 'Grains',     emoji: '🍚', color: '#FEF3C7', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Chicken',     category: 'Meat',       emoji: '🍗', color: '#FECACA', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Cheese',      category: 'Dairy',      emoji: '🧀', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Yogurt',      category: 'Dairy',      emoji: '🥣', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Coffee',      category: 'Beverages',  emoji: '☕', color: '#E9D5FF', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Tea',         category: 'Beverages',  emoji: '🍵', color: '#E9D5FF', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Sugar',       category: 'Pantry',     emoji: '🍬', color: '#FED7AA', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Salt',        category: 'Pantry',     emoji: '🧂', color: '#FED7AA', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Cooking Oil', category: 'Pantry',     emoji: '🫒', color: '#FED7AA', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
+  { name: 'Butter',      category: 'Dairy',      emoji: '🧈', color: '#DBEAFE', occurrenceCount: 0, avgIntervalDays: 0, daysSinceLast: 0, reason: 'Popular', isOverdue: false, isDefault: true },
 ];
 
 const HISTORY_LOOKBACK_DAYS = 120;
-const MAX_SUGGESTIONS = 8;
+const MAX_SUGGESTIONS = 15;
 
 function normalizeName(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -45,15 +57,9 @@ interface FetchOpts { groupId?: string | null; personal?: boolean; }
  * Algorithm:
  *  1. Fetch last 120 days of items in this scope (personal or group).
  *  2. Group by normalized name. Track all created_at timestamps.
- *  3. For each unique item with ≥2 occurrences:
- *       - avg interval = mean days between consecutive purchases
- *       - days since last = today - most recent created_at
- *       - overdue = days since last >= avg interval (predicted restock day reached)
- *  4. Score = occurrenceCount × min(daysSinceLast / avgInterval, 2.0)
- *     (weights frequency; caps overdue factor so very-overdue items don't dominate)
- *  5. Exclude items currently in the active list.
- *  6. If <3 candidates, pad with defaults.
- *  7. Return top 8.
+ *  3. For each unique item with ≥2 occurrences, compute overdue/avg interval.
+ *  4. Exclude items currently in the active list.
+ *  5. Always pad with defaults until we hit MAX_SUGGESTIONS (15).
  */
 export async function getSuggestions(
   opts: FetchOpts,
@@ -162,88 +168,9 @@ export async function getSuggestions(
 
   candidates.sort((a, b) => b.score - a.score);
 
-  // Always pad with defaults until we hit MAX_SUGGESTIONS so the carousel feels
-  // full even for users with limited history.
+  // Always pad with defaults until we hit MAX_SUGGESTIONS so the carousel
+  // feels full even for users with limited history.
   if (candidates.length < MAX_SUGGESTIONS) {
-    for (const d of DEFAULTS) {
-      if (exclude.has(normalizeName(d.name))) continue;
-      if (candidates.find(c => normalizeName(c.name) === normalizeName(d.name))) continue;
-      candidates.push({ ...d, score: 0 });
-      if (candidates.length >= MAX_SUGGESTIONS) break;
-    }
-  }
-
-  return candidates.slice(0, MAX_SUGGESTIONS).map(({ score, ...rest }) => rest);
-}
-ates: [] });
-    }
-    map.get(key)!.dates.push(new Date(it.created_at).getTime());
-  }
-
-  const now = Date.now();
-  const DAY = 86400_000;
-  const candidates: (Suggestion & { score: number })[] = [];
-
-  for (const [key, v] of map) {
-    if (exclude.has(key)) continue;
-    if (v.dates.length < 2) continue;
-
-    v.dates.sort((a, b) => a - b);
-    const last = v.dates[v.dates.length - 1];
-    const daysSinceLast = (now - last) / DAY;
-
-    let totalGap = 0;
-    for (let i = 1; i < v.dates.length; i++) totalGap += (v.dates[i] - v.dates[i - 1]) / DAY;
-    const avgIntervalDays = Math.max(totalGap / (v.dates.length - 1), 1);
-
-    const overdueRatio = daysSinceLast / avgIntervalDays;
-    const isOverdue = overdueRatio >= 0.85; // due or overdue
-    const score = v.dates.length * Math.min(overdueRatio, 2);
-
-    const partial = {
-      name: v.name,
-      category: v.category,
-      emoji: v.emoji,
-      color: v.color,
-      occurrenceCount: v.dates.length,
-      avgIntervalDays,
-      daysSinceLast,
-      isOverdue,
-      isDefault: false,
-    };
-    candidates.push({
-      ...partial,
-      reason: reasonFor(partial),
-      score,
-    });
-  }
-
-  // Add 1-time-bought items as weaker candidates (still useful)
-  for (const [key, v] of map) {
-    if (exclude.has(key)) continue;
-    if (v.dates.length !== 1) continue;
-    const daysSinceLast = (now - v.dates[0]) / DAY;
-    if (daysSinceLast < 7) continue; // too recent — they probably don't need it again yet
-
-    candidates.push({
-      name: v.name,
-      category: v.category,
-      emoji: v.emoji,
-      color: v.color,
-      occurrenceCount: 1,
-      avgIntervalDays: 0,
-      daysSinceLast,
-      isOverdue: false,
-      isDefault: false,
-      reason: 'You bought this before',
-      score: 0.5, // weak
-    });
-  }
-
-  candidates.sort((a, b) => b.score - a.score);
-
-  // Pad with defaults for new users
-  if (candidates.length < 3) {
     for (const d of DEFAULTS) {
       if (exclude.has(normalizeName(d.name))) continue;
       if (candidates.find(c => normalizeName(c.name) === normalizeName(d.name))) continue;
