@@ -2,7 +2,8 @@ import React, { useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
-  withRepeat, withSequence, withTiming, Easing,
+  withRepeat, withSequence, withTiming, withDelay, Easing,
+  FadeInDown,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, SHADOWS } from '../constants/theme';
@@ -49,6 +50,9 @@ export default function EmptyState({
   const floatY = useSharedValue(0);
   const scale1 = useSharedValue(1);
   const scale2 = useSharedValue(1);
+  // Subtle attention nudges for the hint card
+  const bulbScale = useSharedValue(1);
+  const chevX = useSharedValue(0);
 
   useEffect(() => {
     floatY.value = withRepeat(
@@ -66,11 +70,37 @@ export default function EmptyState({
       withSequence(withTiming(1.1, { duration: 2800 }), withTiming(1, { duration: 2800 })),
       -1, true
     );
+    // Bulb: a soft pulse every ~3s. Calls attention to the hint without being noisy.
+    bulbScale.value = withDelay(
+      600,
+      withRepeat(
+        withSequence(
+          withTiming(1.18, { duration: 700, easing: Easing.out(Easing.cubic) }),
+          withTiming(1.0, { duration: 700, easing: Easing.in(Easing.cubic) }),
+          withTiming(1.0, { duration: 1600 }), // long rest between pulses
+        ),
+        -1, false
+      )
+    );
+    // Chevron: a tiny "tap me" rightward nudge every ~2.4s
+    chevX.value = withDelay(
+      900,
+      withRepeat(
+        withSequence(
+          withTiming(3, { duration: 380, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: 380, easing: Easing.in(Easing.quad) }),
+          withTiming(0, { duration: 1600 }),
+        ),
+        -1, false
+      )
+    );
   }, []);
 
   const cartStyle = useAnimatedStyle(() => ({ transform: [{ translateY: floatY.value }] }));
   const ring1Style = useAnimatedStyle(() => ({ transform: [{ scale: scale1.value }], opacity: 0.5 }));
   const ring2Style = useAnimatedStyle(() => ({ transform: [{ scale: scale2.value }], opacity: 0.25 }));
+  const bulbStyle = useAnimatedStyle(() => ({ transform: [{ scale: bulbScale.value }] }));
+  const chevronStyle = useAnimatedStyle(() => ({ transform: [{ translateX: chevX.value }] }));
 
   const handleQuickAdd = (item: typeof QUICK_ITEMS[0]) => {
     if (!onAdd) { onOpenSheet(); return; }
@@ -114,33 +144,45 @@ export default function EmptyState({
 
       {/* Hint: other lists that DO contain items */}
       {otherListsWithItems.length > 0 && (
-        <View style={styles.hintCard} testID="empty-other-lists-hint">
+        <Animated.View
+          entering={FadeInDown.duration(420).delay(120).springify().damping(14)}
+          style={styles.hintCard}
+          testID="empty-other-lists-hint"
+        >
           <View style={styles.hintHeader}>
-            <Ionicons name="bulb-outline" size={16} color={colors.primary} />
+            <Animated.View style={[styles.hintBulbWrap, bulbStyle]}>
+              <Ionicons name="bulb" size={14} color={colors.primary} />
+            </Animated.View>
             <Text style={styles.hintTitle}>Looking for your items?</Text>
           </View>
           <Text style={styles.hintBody}>
             They might be on a different list. Tap one to switch:
           </Text>
           <View style={styles.hintBtns}>
-            {otherListsWithItems.slice(0, 3).map((o) => (
-              <TouchableOpacity
+            {otherListsWithItems.slice(0, 3).map((o, i) => (
+              <Animated.View
                 key={o.scopeId ?? 'personal'}
-                testID={`empty-switch-${o.scopeId ?? 'personal'}`}
-                style={styles.hintBtn}
-                onPress={() => onSwitchTo?.(o.scopeId)}
-                activeOpacity={0.85}
+                entering={FadeInDown.duration(360).delay(220 + i * 80).springify().damping(16)}
               >
-                <Text style={styles.hintBtnEmoji}>{o.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.hintBtnName} numberOfLines={1}>{o.name}</Text>
-                  <Text style={styles.hintBtnCount}>{o.count} item{o.count !== 1 ? 's' : ''}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  testID={`empty-switch-${o.scopeId ?? 'personal'}`}
+                  style={styles.hintBtn}
+                  onPress={() => onSwitchTo?.(o.scopeId)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.hintBtnEmoji}>{o.emoji}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.hintBtnName} numberOfLines={1}>{o.name}</Text>
+                    <Text style={styles.hintBtnCount}>{o.count} item{o.count !== 1 ? 's' : ''}</Text>
+                  </View>
+                  <Animated.View style={chevronStyle}>
+                    <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                  </Animated.View>
+                </TouchableOpacity>
+              </Animated.View>
             ))}
           </View>
-        </View>
+        </Animated.View>
       )}
 
       <TouchableOpacity
@@ -212,7 +254,12 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.primary + '22',
     ...SHADOWS.sm,
   },
-  hintHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  hintHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  hintBulbWrap: {
+    width: 24, height: 24, borderRadius: 8,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
   hintTitle: { fontSize: 13, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.2 },
   hintBody: { fontSize: 12, color: colors.textSecondary, marginBottom: 10, fontWeight: '500' },
   hintBtns: { gap: 8 },
