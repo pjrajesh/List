@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   StatusBar, Modal, TextInput, KeyboardAvoidingView,
@@ -8,31 +8,26 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import * as Notifications from 'expo-notifications';
 import { ColorScheme, SHADOWS } from '../../src/constants/theme';
 import { useTheme, useSettings } from '../../src/store/settings';
 import { useAuth } from '../../src/store/auth';
 import { formatCurrency } from '../../src/utils/currency';
 import { CATEGORIES } from '../../src/data/mockData';
-import {
-  RemoteItem, listItems, addItemsBulk, updateItem, deleteItem, deleteItemsByIds,
-  getAllScopeCounts, ScopeCount,
-} from '../../src/api/items';
+import { RemoteItem } from '../../src/api/items';
 import Logo from '../../src/components/Logo';
-import { listMyGroups, Group } from '../../src/api/groups';
-import { getSuggestions, Suggestion } from '../../src/api/suggestions';
-import { sendPushNotification, fetchMyPrefs } from '../../src/api/notifications';
-import { scheduleSuggestionReminderIfNeeded } from '../../src/utils/notifications';
+import { Suggestion } from '../../src/api/suggestions';
 import { publishListToWidget } from '../../src/widgets/sync';
-import { supabase } from '../../src/lib/supabase';
 import AddItemSheet from '../../src/components/AddItemSheet';
 import EmptyState from '../../src/components/EmptyState';
 import SuggestionsCarousel from '../../src/components/SuggestionsCarousel';
+import { useItems } from '../../src/hooks/useItems';
+import { useSuggestions } from '../../src/hooks/useSuggestions';
+import { useItemActions } from '../../src/hooks/useItemActions';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { currency, budget, currentGroupId } = useSettings();
+  const { currency, budget, currentGroupId, setCurrentGroupId } = useSettings();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   // Tab bar height ≈ paddingTop(8) + container(74) + paddingBottom(insets.bottom + 8) ≈ 90 + insets.bottom.
@@ -40,14 +35,20 @@ export default function HomeScreen() {
   const fabBottom = 90 + insets.bottom + 12;
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [items, setItems] = useState<RemoteItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [group, setGroup] = useState<Group | null>(null);
-  const [groupCount, setGroupCount] = useState(0);
-  const [scopeCounts, setScopeCounts] = useState<ScopeCount[]>([]);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [suggestLoading, setSuggestLoading] = useState(true);
+  // ── Data layer (hooks) ────────────────────────────────────────────────
+  const {
+    items, loading, group, scopeCounts, scope,
+  } = useItems({ user, currentGroupId });
 
+  const { suggestions, loading: suggestLoading, refresh: refreshSuggestions, handleAdd: handleSuggestionAdd } =
+    useSuggestions({ scope, currentItemNames: items.map(i => i.name), user });
+
+  const {
+    toggleItem, addItems: handleAddItems, removeItem: onDeleteItem,
+    updatePrice, editItem: applyEdit, clearChecked: doClearChecked, clearAll: doClearAll,
+  } = useItemActions({ scope, currentGroupId, group, user, items });
+
+  // ── Local UI state ────────────────────────────────────────────────────
   const [showSheet, setShowSheet] = useState(false);
   const [priceItem, setPriceItem] = useState<RemoteItem | null>(null);
   const [priceText, setPriceText] = useState('');
@@ -59,113 +60,7 @@ export default function HomeScreen() {
 
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  const scope = useMemo(() =>
-    currentGroupId ? { groupId: currentGroupId } : { personal: true as const },
-    [currentGroupId]
-  );
-
-  // Load items + groups
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [list, groups, counts] = await Promise.all([
-        listItems(scope),
-        listMyGroups(),
-        getAllScopeCounts().catch(() => [] as ScopeCount[]),
-      ]);
-      setItems(list);
-      setGroupCount(groups.length);
-      setScopeCounts(counts);
-      if (currentGroupId) {
-        setGroup(groups.find(g => g.id === currentGroupId) ?? null);
-      } else {
-        setGroup(null);
-      }
-    } catch {
-      // RLS or not authed
-    } finally {
-      setLoading(false);
-    }
-  }, [scope, currentGroupId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // Refresh suggestions whenever items list changes (so newly-added items are excluded
-  // from the carousel, and so checked-off items propagate into history).
-  const refreshSuggestions = useCallback(async () => {
-    setSuggestLoading(true);
-    try {
-      const currentNames = items.map(i => i.name);
-      const sg = await getSuggestions(scope, currentNames);
-      setSuggestions(sg);
-
-      // Schedule a local "smart suggestion" reminder for tomorrow morning if any are overdue
-      // (respects the user's notification preferences). Best-effort, fire-and-forget.
-      if (user?.id) {
-        fetchMyPrefs(user.id).then(prefs => {
-          const enabled = !prefs.muted && !!prefs.suggestion_reminders;
-          scheduleSuggestionReminderIfNeeded(sg, enabled).catch(() => {});
-        }).catch(() => {});
-      }
-    } finally {
-      setSuggestLoading(false);
-    }
-  }, [scope, items, user]);
-
-  useEffect(() => { refreshSuggestions(); }, [refreshSuggestions]);
-
-  const handleSuggestionAdd = useCallback(async (s: Suggestion) => {
-    try {
-      await addItemsBulk(scope, [{
-        name: s.name,
-        category: s.category ?? null,
-        emoji: s.emoji ?? null,
-        color: s.color ?? null,
-      }]);
-    } catch (e: any) {
-      Alert.alert('Could not add', e?.message ?? 'Please try again.');
-    }
-  }, [scope]);
-
-  // Realtime subscription
-  useEffect(() => {
-    if (!user) return;
-    const channelName = currentGroupId ? `items:group:${currentGroupId}` : `items:personal:${user.id}`;
-    const filter = currentGroupId
-      ? `group_id=eq.${currentGroupId}`
-      : `owner_id=eq.${user.id}`;
-
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const row = payload.new as RemoteItem;
-          setItems(prev => {
-            if (prev.some(p => p.id === row.id)) return prev;
-            return [...prev, row];
-          });
-          // Local notification when someone ELSE added
-          if (row.created_by !== user.id && currentGroupId) {
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: `New item in ${group?.name ?? 'your group'}`,
-                body: `${row.name} was just added`,
-              },
-              trigger: null,
-            }).catch(() => {});
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          const row = payload.new as RemoteItem;
-          setItems(prev => prev.map(p => p.id === row.id ? row : p));
-        } else if (payload.eventType === 'DELETE') {
-          const row = payload.old as RemoteItem;
-          setItems(prev => prev.filter(p => p.id !== row.id));
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [user, currentGroupId, group]);
+  // Load items + groups + suggestions — hooks handle this internally.
 
   const totalSpent = items.filter(i => i.price !== null).reduce((s, i) => s + (i.price || 0), 0);
   const budgetProgress = Math.min(totalSpent / budget, 1);
@@ -173,60 +68,14 @@ export default function HomeScreen() {
   const unchecked = items.filter(i => !i.checked);
   const allItems = [...unchecked, ...checked];
 
-  const toggleItem = useCallback(async (item: RemoteItem) => {
-    const willBeChecked = !item.checked;
-    await updateItem(item.id, { checked: willBeChecked });
-    // Notify other group members when an item is checked off (not on un-check)
-    if (willBeChecked && currentGroupId) {
-      sendPushNotification({
-        event: 'item_checked',
-        title: `✓ ${item.name} checked off`,
-        body: `${user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Someone'} checked off ${item.name} in ${group?.name ?? 'your list'}`,
-        group_id: currentGroupId,
-        data: { item_id: item.id, group_id: currentGroupId },
-      });
-    }
-  }, [currentGroupId, user, group]);
-
-  const handleAddItems = useCallback(async (drafts: { name: string; category: string; emoji: string; color: string; }[]) => {
-    try {
-      await addItemsBulk(scope, drafts.map(d => ({
-        name: d.name,
-        category: d.category,
-        emoji: d.emoji,
-        color: d.color,
-        price: null,
-      })));
-      // Notify other group members when items are added to a shared group
-      if (currentGroupId && drafts.length > 0) {
-        const previewName = drafts[0].name;
-        const more = drafts.length > 1 ? ` and ${drafts.length - 1} more` : '';
-        sendPushNotification({
-          event: 'item_added',
-          title: `New item${drafts.length > 1 ? 's' : ''} in ${group?.name ?? 'your list'}`,
-          body: `${user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Someone'} added ${previewName}${more}`,
-          group_id: currentGroupId,
-          data: { group_id: currentGroupId, count: drafts.length },
-        });
-      }
-    } catch (e: any) {
-      Alert.alert('Could not add', e?.message ?? 'Please try again.');
-      throw e;
-    }
-  }, [scope, currentGroupId, user, group]);
-
   const handleSavePrice = useCallback(async () => {
     if (!priceItem || !priceText) return;
     const price = parseFloat(priceText);
     if (isNaN(price)) return;
-    await updateItem(priceItem.id, { price });
+    await updatePrice(priceItem.id, price);
     setPriceItem(null);
     setPriceText('');
-  }, [priceItem, priceText]);
-
-  const onDeleteItem = useCallback(async (id: string) => {
-    await deleteItem(id);
-  }, []);
+  }, [priceItem, priceText, updatePrice]);
 
   const openEdit = useCallback((item: RemoteItem) => {
     const cat = CATEGORIES.find(c => c.name === item.category) ?? CATEGORIES[0];
@@ -240,7 +89,7 @@ export default function HomeScreen() {
   const handleEditSave = useCallback(async () => {
     if (!editItem || !editName.trim()) return;
     const parsedPrice = editPrice ? parseFloat(editPrice) : null;
-    await updateItem(editItem.id, {
+    await applyEdit(editItem.id, {
       name: editName.trim(),
       price: parsedPrice !== null && !isNaN(parsedPrice) ? parsedPrice : null,
       category: editCategory.name,
@@ -248,18 +97,17 @@ export default function HomeScreen() {
       color: editCategory.color,
     });
     setEditItem(null);
-  }, [editItem, editName, editPrice, editCategory]);
+  }, [editItem, editName, editPrice, editCategory, applyEdit]);
 
   const clearChecked = useCallback(async () => {
-    const ids = items.filter(i => i.checked).map(i => i.id);
-    await deleteItemsByIds(ids);
+    await doClearChecked();
     setShowListOptions(false);
-  }, [items]);
+  }, [doClearChecked]);
 
   const clearAll = useCallback(async () => {
-    await deleteItemsByIds(items.map(i => i.id));
+    await doClearAll();
     setShowListOptions(false);
-  }, [items]);
+  }, [doClearAll]);
 
   const renderRightActions = (itemId: string) => (
     <TouchableOpacity testID={`delete-action-${itemId}`} style={styles.deleteAction} onPress={() => onDeleteItem(itemId)}>
@@ -415,16 +263,12 @@ export default function HomeScreen() {
         otherListsWithItems={otherListsWithItems}
         onSwitchTo={(scopeId) => setCurrentGroupId(scopeId)}
         onAdd={async (item) => {
-          try {
-            await addItemsBulk(scope, [{
-              name: item.name,
-              category: item.category,
-              emoji: item.categoryEmoji,
-              color: item.categoryColor,
-            }]);
-          } catch (e: any) {
-            Alert.alert('Could not add', e?.message ?? 'Please try again.');
-          }
+          await handleAddItems([{
+            name: item.name,
+            category: item.category,
+            emoji: item.categoryEmoji,
+            color: item.categoryColor,
+          }]);
         }}
         onOpenSheet={() => setShowSheet(true)}
       />
