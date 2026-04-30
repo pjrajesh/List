@@ -43,6 +43,20 @@ class StatusCheckCreate(BaseModel):
 async def root():
     return {"message": "Hello World"}
 
+@api_router.get("/health")
+async def health():
+    """Top-level readiness probe used by deployment health checks."""
+    import os
+    return {
+        "ok": True,
+        "service": "listorix-backend",
+        "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "supabase_configured": bool(os.getenv("SUPABASE_URL")) and (
+            bool(os.getenv("SUPABASE_SERVICE_KEY")) or bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        ),
+        "mongo_configured": bool(os.getenv("MONGO_URL")),
+    }
+
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
     status_dict = input.dict()

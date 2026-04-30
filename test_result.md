@@ -457,3 +457,68 @@ frontend:
             All data is computed client-side from Supabase items and usage_quotas tables — no backend
             changes required. Bundle compiles cleanly; web preview verified.
             Manual testing on physical device recommended (streaks fill in once items are added).
+  - task: "Deployment Readiness Health Check (Session 5)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            ADDED: /api/health endpoint returning {ok, openai_configured, supabase_configured,
+            mongo_configured} for deployment probes.
+            VERIFIED manually: /api/health=200, /api/ai/health=200, /api/notifications/health=200.
+            Env vars confirmed set: MONGO_URL, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY.
+            Please run comprehensive regression across /api/health, /api/ai/*, /api/notifications/*
+            to confirm no breakage from recent front-end refactor (useItems/useSuggestions/useItemActions
+            hook extraction — no backend code was changed apart from the new /api/health route).
+        - working: true
+          agent: "testing"
+          comment: |
+            Comprehensive deployment readiness regression executed via /app/backend_test.py against
+            the public preview URL (https://honest-critique-2.preview.emergentagent.com/api).
+            ALL 10 CHECKS PASSED — VERDICT: GREEN.
+
+            Health probes (no auth):
+              [PASS] GET /api/health → 200, body={ok:true, service:"listorix-backend",
+                     openai_configured:true, supabase_configured:true, mongo_configured:true}
+              [PASS] GET /api/ai/health → 200, body={ok:true, openai_configured:true,
+                     voice_limit:20, scan_limit:10}
+              [PASS] GET /api/notifications/health → 200, body={ok:true, supabase_configured:true,
+                     supabase_url_set:true, service_key_set:true}
+
+            Auth gates (without Authorization header):
+              [PASS] GET  /api/ai/usage           → 401
+              [PASS] POST /api/ai/voice/transcribe → 401
+              [PASS] POST /api/ai/scan/receipt    → 401
+              [PASS] POST /api/notifications/send → 401
+
+            Routing sanity:
+              [PASS] GET /api/xyz-that-does-not-exist → 404 with FastAPI body
+                     {"detail":"Not Found"} (proves Kubernetes ingress is forwarding 404s
+                     from FastAPI, not the cluster layer).
+
+            Authed positive tests (minted fresh Supabase JWT via /auth/v1/signup with anon key):
+              [PASS] GET /api/ai/usage?day_local=2026-04-30 (Bearer) → 200
+                     {day_local, voice_count:0, voice_limit:20, voice_remaining:20,
+                      scan_count:0, scan_limit:10, scan_remaining:10}
+              [PASS] POST /api/notifications/send (Bearer, body={event:"item_added"} missing
+                     title/body) → 422 with Pydantic missing-field errors for both fields.
+
+            CONCLUSION: front-end refactor (useItems / useSuggestions / useItemActions hook
+            extraction) caused zero backend breakage. /api/health endpoint is functioning and
+            ready for deployment probes. All env vars (OPENAI_API_KEY, SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY, MONGO_URL) confirmed loaded server-side. No code changes
+            were made by the testing agent.
+
+agent_communication:
+    - agent: "testing"
+      message: |
+        Deployment Readiness Health Check (Session 5) — VERDICT: GREEN.
+        10/10 backend checks passed against public preview URL. All 3 health endpoints return
+        the exact expected shape, all 4 auth-gated endpoints correctly reject anonymous requests
+        with 401, FastAPI 404 routing confirmed, and authed positive tests (usage + validation)
+        also pass. Backend is ready to deploy. No issues found.

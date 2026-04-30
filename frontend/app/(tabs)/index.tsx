@@ -37,7 +37,7 @@ export default function HomeScreen() {
 
   // ── Data layer (hooks) ────────────────────────────────────────────────
   const {
-    items, loading, group, scopeCounts, scope,
+    items, loading, group, scopeCounts, scope, load,
   } = useItems({ user, currentGroupId });
 
   const { suggestions, loading: suggestLoading, refresh: refreshSuggestions, handleAdd: handleSuggestionAdd } =
