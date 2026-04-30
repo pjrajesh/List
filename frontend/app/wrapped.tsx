@@ -15,15 +15,15 @@ import { formatCurrency } from '../src/utils/currency';
 const { width } = Dimensions.get('window');
 const CARD_W = Math.min(width - 32, 360);
 
-// Sapphire/Gold gradient backgrounds for cards
-const CARD_BACKGROUNDS = [
-  '#1E3A8A', // sapphire
-  '#3B5BBA', // sapphire light
-  '#0F172A', // deep navy
-  '#7C5C24', // gold dark
-  '#B98C32', // gold
-  '#1E3A8A', // sapphire
-];
+// Sapphire-dominant palette. Gold reserved for the "Biggest Splurge" highlight
+// only — a single accent keeps the wrap feeling designed, not festive.
+const CARD_BACKGROUNDS = {
+  heroSapphire:   '#1E3A8A', // primary sapphire — Hero, Closing
+  sapphireLight:  '#3B5BBA', // softer sapphire — Added, Top Category
+  deepNavy:       '#0F172A', // deep navy — Checked, Busiest Day
+  sapphireMid:    '#2F4A9E', // mid sapphire — Total Spent, Top Items
+  gold:           '#B98C32', // gold highlight — Biggest Splurge ONLY
+};
 
 export default function WrappedScreen() {
   const router = useRouter();
@@ -100,7 +100,7 @@ export default function WrappedScreen() {
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Hero */}
-          <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS[0] }]}>
+          <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS.heroSapphire }]}>
             <Text style={styles.heroEyebrow}>Listorix Wrap</Text>
             <Text style={styles.heroMonth}>{data.month_label}</Text>
             <Text style={styles.heroSub}>Here's how you shopped 🎁</Text>
@@ -118,20 +118,20 @@ export default function WrappedScreen() {
             <>
               {/* Items added & checked */}
               <View style={styles.row2}>
-                <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS[1] }]}>
+                <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS.sapphireLight }]}>
                   <Text style={styles.smallCardLabel}>Added</Text>
                   <Text style={styles.smallCardNumber}>{data.items_added}</Text>
                   <Text style={styles.smallCardEmoji}>🛒</Text>
                 </View>
-                <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS[2] }]}>
+                <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS.deepNavy }]}>
                   <Text style={styles.smallCardLabel}>Checked</Text>
                   <Text style={styles.smallCardNumber}>{data.items_checked}</Text>
                   <Text style={styles.smallCardEmoji}>✅</Text>
                 </View>
               </View>
 
-              {/* Total spent */}
-              <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS[4] }]}>
+              {/* Total spent — blue, not gold */}
+              <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS.sapphireMid }]}>
                 <Text style={styles.cardEyebrow}>You spent</Text>
                 <Text style={styles.bigAmount}>{formatCurrency(data.total_spent, currency)}</Text>
                 <Text style={styles.cardSub}>
@@ -139,9 +139,9 @@ export default function WrappedScreen() {
                 </Text>
               </View>
 
-              {/* Biggest splurge */}
+              {/* Biggest splurge — THIS is the one gold highlight */}
               {data.biggest_splurge && (
-                <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS[3] }]}>
+                <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS.gold }]}>
                   <Text style={styles.cardEyebrow}>Biggest Splurge</Text>
                   <View style={styles.splurgeRow}>
                     <Text style={styles.splurgeEmoji}>{data.biggest_splurge.emoji || '💎'}</Text>
@@ -155,7 +155,7 @@ export default function WrappedScreen() {
 
               {/* Top items */}
               {data.top_items.length > 0 && (
-                <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS[5] }]}>
+                <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS.sapphireMid }]}>
                   <Text style={styles.cardEyebrow}>Most Added Items</Text>
                   {data.top_items.map((it, idx) => (
                     <View key={idx} style={styles.topItemRow}>
@@ -171,14 +171,14 @@ export default function WrappedScreen() {
               {/* Top category & most active day */}
               <View style={styles.row2}>
                 {data.top_category && (
-                  <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS[1] }]}>
+                  <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS.sapphireLight }]}>
                     <Text style={styles.smallCardLabel}>Top Category</Text>
                     <Text style={styles.smallCardNumber} numberOfLines={1}>{data.top_category.name}</Text>
                     <Text style={styles.smallCardEmoji}>{data.top_category.emoji || '🏆'}</Text>
                   </View>
                 )}
                 {data.most_active_day && (
-                  <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS[3] }]}>
+                  <View style={[styles.smallCard, { backgroundColor: CARD_BACKGROUNDS.deepNavy }]}>
                     <Text style={styles.smallCardLabel}>Busiest Day</Text>
                     <Text style={styles.smallCardNumber} numberOfLines={1}>
                       {new Date(data.most_active_day.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
@@ -189,14 +189,14 @@ export default function WrappedScreen() {
               </View>
 
               {/* Closing card */}
-              <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS[0] }]}>
+              <View style={[styles.card, { backgroundColor: CARD_BACKGROUNDS.heroSapphire }]}>
                 <Text style={styles.cardEyebrow}>That's a wrap! 🎁</Text>
                 <Text style={styles.cardBody}>
                   You explored {data.distinct_categories} categor{data.distinct_categories === 1 ? 'y' : 'ies'} and made
                   {' '}{data.distinct_active_days} active day{data.distinct_active_days !== 1 ? 's' : ''} of progress.
                 </Text>
                 <TouchableOpacity testID="wrapped-share-cta" style={styles.shareBtn} onPress={handleShare}>
-                  <Ionicons name="share-outline" size={16} color={CARD_BACKGROUNDS[0]} />
+                  <Ionicons name="share-outline" size={16} color={CARD_BACKGROUNDS.heroSapphire} />
                   <Text style={styles.shareBtnText}>Share my wrap</Text>
                 </TouchableOpacity>
               </View>

@@ -26,6 +26,7 @@ export default function InsightsScreen() {
   const [selectedMonth, setSelectedMonth] = useState('Apr');
   const maxAmount = Math.max(...insightsData.categories.map(c => c.amount));
   const maxWeekly = Math.max(...insightsData.weeklyBreakdown.map(w => w.amount));
+  const maxWeeklyIdx = insightsData.weeklyBreakdown.findIndex(w => w.amount === maxWeekly);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} testID="insights-screen">
@@ -91,18 +92,19 @@ export default function InsightsScreen() {
           <View style={styles.weeklyRow}>
             {insightsData.weeklyBreakdown.map((w, idx) => {
               const fillH = Math.round((w.amount / maxWeekly) * 80);
+              const isMax = idx === maxWeeklyIdx;
               return (
                 <View key={idx} style={styles.weekCol} testID={`week-bar-${w.week}`}>
-                  <Text style={styles.weekAmount}>{formatCurrency(w.amount, currency)}</Text>
+                  <Text style={[styles.weekAmount, isMax && styles.weekAmountMax]}>{formatCurrency(w.amount, currency)}</Text>
                   <View style={styles.weekBarBg}>
                     <View
                       style={[
                         styles.weekBarFill,
-                        { height: Math.max(fillH, 8), backgroundColor: idx === 2 ? colors.secondary : colors.primary },
+                        { height: Math.max(fillH, 8), backgroundColor: isMax ? colors.primary : colors.primaryLight },
                       ]}
                     />
                   </View>
-                  <Text style={styles.weekLabel}>{w.week}</Text>
+                  <Text style={[styles.weekLabel, isMax && styles.weekLabelMax]}>{w.week}</Text>
                 </View>
               );
             })}
@@ -113,6 +115,7 @@ export default function InsightsScreen() {
           <Text style={styles.sectionTitle}>By Category</Text>
           {insightsData.categories.map((cat, idx) => {
             const barWidth = Math.max((cat.amount / maxAmount) * BAR_MAX_WIDTH, 12);
+            const isTop = idx === 0;
             return (
               <View key={idx} style={styles.catRow} testID={`category-row-${cat.name}`}>
                 <View style={styles.catEmoji}>
@@ -120,12 +123,15 @@ export default function InsightsScreen() {
                 </View>
                 <View style={styles.catInfo}>
                   <View style={styles.catTopRow}>
-                    <Text style={styles.catName}>{cat.name}</Text>
-                    <Text style={styles.catAmount}>{formatCurrency(cat.amount, currency)}</Text>
+                    <Text style={[styles.catName, isTop && styles.catNameTop]}>{cat.name}</Text>
+                    <Text style={[styles.catAmount, isTop && styles.catAmountTop]}>{formatCurrency(cat.amount, currency)}</Text>
                   </View>
                   <View style={styles.catBarBg}>
                     <View
-                      style={[styles.catBarFill, { width: barWidth, backgroundColor: cat.color }]}
+                      style={[
+                        styles.catBarFill,
+                        { width: barWidth, backgroundColor: isTop ? colors.primary : colors.primaryLight },
+                      ]}
                     />
                   </View>
                 </View>
@@ -136,22 +142,28 @@ export default function InsightsScreen() {
 
         <View style={styles.section} testID="top-insights-section">
           <Text style={styles.sectionTitle}>Smart Tips</Text>
-          <View style={styles.tipCard}>
-            <Text style={styles.tipEmoji}>🥦</Text>
+          <View style={[styles.tipCard, styles.tipCardPrimary]}>
+            <View style={[styles.tipIconWrap, styles.tipIconWrapPrimary]}>
+              <Text style={styles.tipEmoji}>🥦</Text>
+            </View>
             <View style={styles.tipContent}>
               <Text style={styles.tipTitle}>Vegetables up 22%</Text>
               <Text style={styles.tipSubtitle}>Consider buying in bulk from local mandis</Text>
             </View>
           </View>
           <View style={styles.tipCard}>
-            <Text style={styles.tipEmoji}>🛒</Text>
+            <View style={styles.tipIconWrap}>
+              <Text style={styles.tipEmoji}>🛒</Text>
+            </View>
             <View style={styles.tipContent}>
               <Text style={styles.tipTitle}>5 trips this month</Text>
               <Text style={styles.tipSubtitle}>Consolidating to 3 trips could save time</Text>
             </View>
           </View>
           <View style={styles.tipCard}>
-            <Text style={styles.tipEmoji}>💰</Text>
+            <View style={styles.tipIconWrap}>
+              <Text style={styles.tipEmoji}>💰</Text>
+            </View>
             <View style={styles.tipContent}>
               <Text style={styles.tipTitle}>Budget {formatCurrency(budget, currency)} set</Text>
               <Text style={styles.tipSubtitle}>You've used {Math.round((insightsData.totalThisMonth / budget) * 100)}% — on track!</Text>
@@ -204,13 +216,15 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   },
   weeklyRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 140 },
   weekCol: { alignItems: 'center', flex: 1, gap: 6 },
-  weekAmount: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  weekAmount: { fontSize: 11, fontWeight: '600', color: colors.textTertiary },
+  weekAmountMax: { color: colors.textPrimary, fontWeight: '800' },
   weekBarBg: {
     width: 36, height: 90, borderRadius: 8,
     backgroundColor: colors.border, overflow: 'hidden', justifyContent: 'flex-end',
   },
   weekBarFill: { width: '100%', borderRadius: 8 },
-  weekLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  weekLabel: { fontSize: 12, fontWeight: '500', color: colors.textTertiary },
+  weekLabelMax: { color: colors.textPrimary, fontWeight: '700' },
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 },
   catEmoji: {
     width: 44, height: 44, borderRadius: 14,
@@ -219,17 +233,28 @@ const createStyles = (colors: ColorScheme) => StyleSheet.create({
   catEmojiText: { fontSize: 22 },
   catInfo: { flex: 1 },
   catTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  catName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  catAmount: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-  catBarBg: { height: 10, backgroundColor: colors.border, borderRadius: 99, overflow: 'hidden' },
+  catName: { fontSize: 14, fontWeight: '500', color: colors.textSecondary },
+  catNameTop: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  catAmount: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  catAmountTop: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+  catBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 99, overflow: 'hidden' },
   catBarFill: { height: '100%', borderRadius: 99 },
   tipCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, borderRadius: 18,
-    padding: 16, marginBottom: 10, gap: 14, ...SHADOWS.sm,
+    backgroundColor: colors.surface, borderRadius: 16,
+    padding: 14, marginBottom: 8, gap: 12, ...SHADOWS.sm,
   },
-  tipEmoji: { fontSize: 28 },
+  tipCardPrimary: {
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1, borderColor: colors.primary + '30',
+  },
+  tipIconWrap: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: colors.inputBg, alignItems: 'center', justifyContent: 'center',
+  },
+  tipIconWrapPrimary: { backgroundColor: 'rgba(255,255,255,0.6)' },
+  tipEmoji: { fontSize: 20 },
   tipContent: { flex: 1 },
-  tipTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  tipSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2, fontWeight: '400' },
+  tipTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.2 },
+  tipSubtitle: { fontSize: 12.5, color: colors.textSecondary, marginTop: 3, fontWeight: '400', lineHeight: 17 },
 });
